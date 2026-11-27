@@ -126,7 +126,7 @@ mod win {
     }
 
     fn utf16_bytes_to_string(bytes: &[u8]) -> String {
-        let wide: Vec<u16> = bytes.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
+        let wide: Vec<u16> = bytes.as_chunks::<2>().0.iter().map(|c| u16::from_le_bytes(*c)).collect();
         let s = String::from_utf16_lossy(&wide);
         s.trim_end_matches('\0').to_string()
     }

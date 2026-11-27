@@ -35,7 +35,7 @@ pub fn parse_i_file(bytes: &[u8]) -> Option<(u64, u64, String)> {
         }
         _ => return None,
     };
-    let wide: Vec<u16> = path_bytes.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
+    let wide: Vec<u16> = path_bytes.as_chunks::<2>().0.iter().map(|c| u16::from_le_bytes(*c)).collect();
     let end = wide.iter().position(|&c| c == 0).unwrap_or(wide.len());
     Some((size, filetime, String::from_utf16_lossy(&wide[..end])))
 }
