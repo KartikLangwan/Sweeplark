@@ -4130,7 +4130,7 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "sweeplark"
-version = "1.1.0"
+version = "1.4.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -4141,7 +4141,7 @@ dependencies = [
 
 [[package]]
 name = "sweeplark-app"
-version = "1.1.0"
+version = "1.4.0"
 dependencies = [
  "chrono",
  "serde",
@@ -4157,7 +4157,7 @@ dependencies = [
 
 [[package]]
 name = "sweeplark-core"
-version = "1.1.0"
+version = "1.4.0"
 dependencies = [
  "chrono",
  "directories",

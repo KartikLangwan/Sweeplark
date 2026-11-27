@@ -9,7 +9,7 @@
 
 <p align="center">
   <img alt="Windows 10/11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0FB5AE">
-  <img alt="Version" src="https://img.shields.io/badge/version-1.1-0B1B33">
+  <img alt="Version" src="https://img.shields.io/badge/version-1.4-0B1B33">
   <img alt="Offline" src="https://img.shields.io/badge/AI-100%25%20offline-7DE8C8">
   <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-5B6B80">
 </p>
@@ -39,7 +39,7 @@ Not code-signed yet: if SmartScreen appears, click **More info → Run anyway**.
 | 🌐 **English & Hinglish** | English by default; Hinglish can be picked in Settings. |
 | 🚫 **No tracking** | No ads, no account, no telemetry. |
 
-## Features (v1.1)
+## Features (v1.4)
 
 - **One-Click Optimize** — scan junk, startup, storage, health and security; show the plan; fix only the safe part; report what changed.
 - **Cleaner** — 40+ rules: Windows temp, thumbnails, crash dumps, error reports, Windows Update leftovers, Recycle Bin (older than N days), Chrome / Edge / Firefox / Brave / Opera / Vivaldi caches, Discord / Teams / Slack, Steam / Epic / Battle.net, GPU shader caches, npm / pip / Gradle / Cargo / Go caches, and opt-in browser history & cookies.

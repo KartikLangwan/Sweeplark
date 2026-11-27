@@ -66,7 +66,7 @@
     <div class="foot">
       <div class="local"><Icon name="lock" size={14} /><span>{t("Offline · no tracking", "Offline · koi tracking nahi")}</span></div>
       <div class="row">
-        <span class="muted small">v{ui.info?.version ?? "1.1.0"}</span>
+        <span class="muted small">v{ui.info?.version ?? "1.4.0"}</span>
         <span class="spacer"></span>
         <button class="btn ghost small" onclick={cycleTheme} title="Theme: {ui.theme}" aria-label={t("Change theme", "Theme badlein")}>
           <Icon name={ui.theme === "dark" ? "moon" : ui.theme === "light" ? "sun" : "sparkle"} size={16} />
