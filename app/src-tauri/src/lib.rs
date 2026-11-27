@@ -160,7 +160,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_autostart::Builder::new().args(["--background"]).build())
         .setup(move |app| {
-            let state = AppState::new().map_err(|e| Box::<dyn std::error::Error>::from(e))?;
+            let state = AppState::new().map_err(Box::<dyn std::error::Error>::from)?;
             app.manage(state);
             build_tray(app.handle())?;
             refresh_tray(app.handle());

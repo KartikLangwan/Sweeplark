@@ -86,7 +86,7 @@ const startup: StartupItem[] = [
 
 let settings: Settings = {
   trust_level: "ask", whitelist: [], recycle_bin_min_age_days: 7, privacy_consent: false, disabled_cleaners: [],
-  enabled_cleaners: [], language: "hinglish",
+  enabled_cleaners: [], language: "en",
   agent: {
     enabled: true, start_with_windows: true, sample_minutes: 5, daily_summary: "21:00",
     weekly_summary: { weekday: 6, time: "20:00" }, smart_alerts: true,
@@ -145,7 +145,7 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export async function mock<T>(cmd: string, args: Record<string, unknown> = {}): Promise<T> {
   await wait(cmd === "scan" || cmd === "optimize_plan" ? 900 : 120);
   const table: Record<string, unknown> = {
-    app_info: { name: "Sweeplark", tagline: "Small bird. Clean PC.", tagline_hi: "Saaf PC, tez PC, aur control aapke haath mein.", version: "0.1.0", is_admin: false, os: "windows" } satisfies AppInfo,
+    app_info: { name: "Sweeplark", tagline: "Small bird. Clean PC.", tagline_hi: "Saaf PC, tez PC, aur control aapke haath mein.", version: "1.1.0", is_admin: false, os: "windows" } satisfies AppInfo,
     get_health: health,
     scan,
     clean: { freed_bytes: 2.36 * GB, deleted_files: 16541, ledger_id: 7,

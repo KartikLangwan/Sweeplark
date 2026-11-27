@@ -456,10 +456,8 @@ pub async fn efficiency_mode(app: AppHandle, name: String, on: bool) -> CmdResul
         let mut changed = 0;
         for (pid, p) in sys.processes() {
             let pname = p.name().to_string_lossy().to_lowercase();
-            if pname == want || pname.trim_end_matches(".exe") == want {
-                if system::set_efficiency_mode(pid.as_u32(), on).is_ok() {
-                    changed += 1;
-                }
+            if (pname == want || pname.trim_end_matches(".exe") == want) && system::set_efficiency_mode(pid.as_u32(), on).is_ok() {
+                changed += 1;
             }
         }
         if changed == 0 {

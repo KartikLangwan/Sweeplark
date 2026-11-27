@@ -127,7 +127,7 @@ fn status_label(s: &PreviewStatus) -> String {
 }
 
 fn print_scan(report: &cleaner::ScanReport) {
-    println!("{:<34} {:>7} {:>10}  {}", "Cleaner", "Risk", "Size", "");
+    println!("{:<34} {:>7} {:>10}", "Cleaner", "Risk", "Size");
     for c in &report.cleaners {
         let size = if c.files > 0 { format_bytes(c.bytes) } else { "-".into() };
         println!("{:<34} {:>7} {:>10}  {}", c.name, risk_label(c.risk), size, status_label(&c.status));

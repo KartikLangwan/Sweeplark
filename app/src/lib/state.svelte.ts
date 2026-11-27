@@ -20,6 +20,11 @@ export function toast(text: string, tone: "good" | "warn" | "info" = "good") {
   setTimeout(() => (ui.toasts = ui.toasts.filter((t) => t.id !== id)), 4200);
 }
 
+/** Pick the UI text for the current language (English by default). */
+export function t(en: string, hi: string): string {
+  return ui.settings?.language === "hinglish" ? hi : en;
+}
+
 export function go(page: Page) {
   ui.page = page;
 }

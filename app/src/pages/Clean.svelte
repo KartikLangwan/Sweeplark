@@ -3,13 +3,14 @@
   import Modal from "../components/Modal.svelte";
   import { api } from "../lib/api";
   import { bytes, shortPath } from "../lib/format";
-  import { toast, ui } from "../lib/state.svelte";
+  import { toast, ui , t } from "../lib/state.svelte";
   import type { CleanReport, CleanerPreview, ScanReport } from "../lib/types";
 
-  const CATS: Record<string, string> = {
-    system: "Windows", browser: "Browsers", apps: "Apps", games: "Games", developer: "Developer tools",
-    logs: "Logs aur crash dumps", recycle_bin: "Recycle Bin", privacy: "Privacy (history, cookies)",
-  };
+  const CATS = $derived<Record<string, string>>({
+    system: "Windows", browser: t("Browsers", "Browsers"), apps: t("Apps", "Apps"), games: t("Games", "Games"),
+    developer: t("Developer tools", "Developer tools"), logs: t("Logs and crash dumps", "Logs aur crash dumps"),
+    recycle_bin: "Recycle Bin", privacy: t("Privacy (history, cookies)", "Privacy (history, cookies)"),
+  });
 
   let report = $state<ScanReport | null>(null);
   let scanning = $state(false);
@@ -55,7 +56,7 @@
     cleaning = true;
     try {
       result = await api.clean(chosen.map((c) => c.id), confirmed, flaggedChosen.map((f) => f.path));
-      toast(`${bytes(result.freed_bytes)} jagah khaali hui`);
+      toast(t(`Freed ${bytes(result.freed_bytes)}`, `${bytes(result.freed_bytes)} jagah khaali hui`));
       report = null;
     } catch (e) {
       toast(String(e), "warn");
@@ -66,18 +67,18 @@
 
   function statusText(c: CleanerPreview): string {
     switch (c.status.kind) {
-      case "empty": return "Kuch nahi mila";
-      case "needs_admin": return "Admin chahiye";
-      case "app_running": return `Pehle band karein: ${c.status.apps.join(", ")}`;
+      case "empty": return t("Nothing found", "Kuch nahi mila");
+      case "needs_admin": return t("Needs administrator", "Admin chahiye");
+      case "app_running": return t(`Close first: ${c.status.apps.join(", ")}`, `Pehle band karein: ${c.status.apps.join(", ")}`);
       default: return "";
     }
   }
 </script>
 
 <header class="head">
-  <div><h1>Safai</h1><p class="muted">Temp files, cache, logs aur purana kachra. Pehle dekhiye, phir chuniye.</p></div>
+  <div><h1>{t("Clean", "Safai")}</h1><p class="muted">{t("Temp files, caches, logs and leftovers. Look first, then choose.", "Temp files, cache, logs aur purana kachra. Pehle dekhiye, phir chuniye.")}</p></div>
   <button class="btn primary big" onclick={scan} disabled={scanning || cleaning}>
-    {#if scanning}<div class="spin" style="border-top-color:#fff"></div>Scan ho raha hai…{:else}<Icon name="broom" />{report ? "Dobara scan" : "Scan karein"}{/if}
+    {#if scanning}<div class="spin" style="border-top-color:#fff"></div>{t("Scanning…", "Scan ho raha hai…")}{:else}<Icon name="broom" />{report ? t("Scan again", "Dobara scan") : t("Scan", "Scan karein")}{/if}
   </button>
 </header>
 
@@ -85,11 +86,11 @@
   <div class="card done fade">
     <span class="big-ic"><Icon name="check" size={26} /></span>
     <div class="col" style="gap:4px">
-      <h2>{bytes(result.freed_bytes)} jagah khaali hui</h2>
-      <p class="muted">{result.deleted_files.toLocaleString()} files hatayi.
-        {#if result.outcomes.some((o) => o.in_use)}Kuch files kisi app ke use mein thi, unhe chhod diya.{/if}
-        {#if result.outcomes.some((o) => o.kept_for_approval)}Aapki files jaisi lagne wali files ko haath nahi lagaya.{/if}
-        Yeh safai "Hisaab" mein likh di gayi hai.</p>
+      <h2>{t(`Freed ${bytes(result.freed_bytes)}`, `${bytes(result.freed_bytes)} jagah khaali hui`)}</h2>
+      <p class="muted">{t(`Removed ${result.deleted_files.toLocaleString()} files.`, `${result.deleted_files.toLocaleString()} files hatayi.`)}
+        {#if result.outcomes.some((o) => o.in_use)}{t("Some files were in use and were skipped.", "Kuch files kisi app ke use mein thi, unhe chhod diya.")}{/if}
+        {#if result.outcomes.some((o) => o.kept_for_approval)}{t("Files that look like yours were not touched.", "Aapki files jaisi lagne wali files ko haath nahi lagaya.")}{/if}
+        {t("Recorded in History.", "Yeh safai Hisaab mein likh di gayi hai.")}</p>
     </div>
   </div>
 {/if}
@@ -97,11 +98,11 @@
 {#if !report && !scanning && !result}
   <div class="card intro">
     <div class="col">
-      <h2>Kya-kya saaf hota hai</h2>
+      <h2>{t("What gets cleaned", "Kya-kya saaf hota hai")}</h2>
       <div class="grid3">
-        <div><Icon name="file" /><strong>Windows</strong><span class="muted small">Temp files, thumbnail cache, crash dumps, update ka bacha data</span></div>
-        <div><Icon name="sparkle" /><strong>Browsers aur apps</strong><span class="muted small">Chrome, Edge, Firefox, Brave, Discord, Teams ka cache: login safe</span></div>
-        <div><Icon name="lock" /><strong>Kabhi nahi</strong><span class="muted small">Documents, Desktop, Photos, Downloads: personal files kabhi khud nahi</span></div>
+        <div><Icon name="file" /><strong>Windows</strong><span class="muted small">{t("Temp files, thumbnail cache, crash dumps, update leftovers", "Temp files, thumbnail cache, crash dumps, update ka bacha data")}</span></div>
+        <div><Icon name="sparkle" /><strong>{t("Browsers and apps", "Browsers aur apps")}</strong><span class="muted small">{t("Chrome, Edge, Firefox, Brave, Discord, Teams caches. Logins stay.", "Chrome, Edge, Firefox, Brave, Discord, Teams ka cache: login safe")}</span></div>
+        <div><Icon name="lock" /><strong>{t("Never", "Kabhi nahi")}</strong><span class="muted small">{t("Documents, Desktop, Pictures, Downloads: personal files are never touched", "Documents, Desktop, Photos, Downloads: personal files kabhi khud nahi")}</span></div>
       </div>
     </div>
   </div>
@@ -109,11 +110,11 @@
 
 {#if report}
   <div class="toolbar card flat">
-    <div><strong class="num big">{bytes(total)}</strong> <span class="muted">chuna gaya · {chosen.length} cleaners</span></div>
+    <div><strong class="num big">{bytes(total)}</strong> <span class="muted">{t(`selected · ${chosen.length} cleaners`, `chuna gaya · ${chosen.length} cleaners`)}</span></div>
     <span class="spacer"></span>
-    <span class="muted small">Scan {(report.duration_ms / 1000).toFixed(1)}s mein</span>
+    <span class="muted small">{t(`Scanned in ${(report.duration_ms / 1000).toFixed(1)}s`, `Scan ${(report.duration_ms / 1000).toFixed(1)}s mein`)}</span>
     <button class="btn primary" onclick={start} disabled={!chosen.length || cleaning}>
-      {#if cleaning}<div class="spin" style="border-top-color:#fff"></div>{:else}<Icon name="broom" size={18} />{/if}Saaf karein
+      {#if cleaning}<div class="spin" style="border-top-color:#fff"></div>{:else}<Icon name="broom" size={18} />{/if}{t("Clean now", "Saaf karein")}
     </button>
   </div>
 
@@ -126,8 +127,8 @@
             <input type="checkbox" bind:checked={selected[c.id]} disabled={c.status.kind !== "ready"} aria-label={c.name} />
             <button class="name" onclick={() => (open[c.id] = !open[c.id])} disabled={!c.files}>
               <span class="row"><strong>{c.name}</strong>
-                <span class="chip {c.risk}">{c.risk === "safe" ? "Safe" : c.risk === "ask" ? "Poochega" : "Expert"}</span>
-                {#if c.flagged.length}<span class="chip ask">{c.flagged.length} files aapki ho sakti hain</span>{/if}
+                <span class="chip {c.risk}">{c.risk === "safe" ? "Safe" : c.risk === "ask" ? t("Asks first", "Poochega") : "Expert"}</span>
+                {#if c.flagged.length}<span class="chip ask">{t(`${c.flagged.length} files may be yours`, `${c.flagged.length} files aapki ho sakti hain`)}</span>{/if}
               </span>
               <span class="muted small">{statusText(c) || c.description}</span>
             </button>
@@ -138,7 +139,7 @@
             <div class="details fade">
               {#if c.note}<p class="note"><Icon name="alert" size={15} />{c.note}</p>{/if}
               {#if c.flagged.length}
-                <p class="small"><strong>In files ko tabhi hatayenge jab aap tick karenge:</strong></p>
+                <p class="small"><strong>{t("These are only removed if you tick them:", "In files ko tabhi hatayenge jab aap tick karenge:")}</strong></p>
                 {#each c.flagged as f}
                   <label class="frow">
                     <input type="checkbox" bind:checked={approvedFiles[f.path]} />
@@ -148,11 +149,11 @@
                   {#if f.review}<p class="review small">{f.review}</p>{/if}
                 {/each}
               {/if}
-              <p class="small muted">Sabse badi files ({c.files.toLocaleString()} mein se):</p>
+              <p class="small muted">{t(`Largest files (of ${c.files.toLocaleString()}):`, `Sabse badi files (${c.files.toLocaleString()} mein se):`)}</p>
               {#each c.sample.slice(0, 8) as s}
                 <div class="frow"><span class="path selectable" title={s.path}>{shortPath(s.path, 86)}</span><span class="spacer"></span><span class="num muted">{bytes(s.bytes)}</span></div>
               {/each}
-              {#each c.blocked as b}<p class="small muted">Safety ne roka: {b}</p>{/each}
+              {#each c.blocked as b}<p class="small muted">{t("Blocked by safety:", "Safety ne roka:")} {b}</p>{/each}
             </div>
           {/if}
         {/each}
@@ -161,16 +162,16 @@
   {/each}
 {/if}
 
-<Modal bind:open={confirm} title="Pakka saaf karein?">
+<Modal bind:open={confirm} title={t("Clean these?", "Pakka saaf karein?")}>
   <div class="col">
-    <p>Yeh cheezein dhyan se dekh lein:</p>
+    <p>{t("Please check these first:", "Yeh cheezein dhyan se dekh lein:")}</p>
     {#each risky as c}<div class="note"><Icon name="alert" size={15} /><span><strong>{c.name}</strong>{c.note ? `: ${c.note}` : ""}</span></div>{/each}
-    {#if flaggedChosen.length}<div class="note"><Icon name="file" size={15} /><span>Aapne {flaggedChosen.length} aisi files chuni hain jo aapki ho sakti hain. Ye wapas nahi aayengi.</span></div>{/if}
-    <p class="muted small">Cache aur temp files delete hone ke baad wapas nahi aatin. Apps unhe zarurat par dobara bana leti hain.</p>
+    {#if flaggedChosen.length}<div class="note"><Icon name="file" size={15} /><span>{t(`You picked ${flaggedChosen.length} files that may be yours. They cannot be restored.`, `Aapne ${flaggedChosen.length} aisi files chuni hain jo aapki ho sakti hain. Ye wapas nahi aayengi.`)}</span></div>{/if}
+    <p class="muted small">{t("Deleted cache and temp files don't come back. Apps recreate them when needed.", "Cache aur temp files delete hone ke baad wapas nahi aatin. Apps unhe zarurat par dobara bana leti hain.")}</p>
   </div>
   {#snippet footer()}
-    <button class="btn" onclick={() => (confirm = false)}>Ruko</button>
-    <button class="btn primary" onclick={() => run(true)}>Haan, saaf karo</button>
+    <button class="btn" onclick={() => (confirm = false)}>{t("Cancel", "Ruko")}</button>
+    <button class="btn primary" onclick={() => run(true)}>{t("Yes, clean", "Haan, saaf karo")}</button>
   {/snippet}
 </Modal>
 
@@ -190,7 +191,7 @@
   .path { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 12px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .note { display: flex; gap: 8px; align-items: flex-start; padding: 9px 11px; border-radius: 10px; background: var(--amber-soft); color: var(--amber-text); font-size: 13px; }
   .review { margin: -2px 0 4px 25px; color: var(--teal-text); }
-  .done { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; background: linear-gradient(120deg, var(--surface), var(--good-soft)); }
+  .done { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
   .big-ic { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: var(--good); color: #fff; flex: none; }
   .intro .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 6px; }
   .intro .grid3 > div { display: flex; flex-direction: column; gap: 6px; padding: 14px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); color: var(--teal-text); }

@@ -11,18 +11,20 @@ export function pct(n: number): string {
   return `${Math.round(n)}%`;
 }
 
+import { t } from "./state.svelte";
+
 export function ago(iso: string): string {
   const s = (Date.now() - new Date(iso).getTime()) / 1000;
-  if (s < 60) return "abhi";
-  if (s < 3600) return `${Math.floor(s / 60)} min pehle`;
-  if (s < 86400) return `${Math.floor(s / 3600)} ghante pehle`;
+  if (s < 60) return t("just now", "abhi");
+  if (s < 3600) return t(`${Math.floor(s / 60)} min ago`, `${Math.floor(s / 60)} min pehle`);
+  if (s < 86400) return t(`${Math.floor(s / 3600)} h ago`, `${Math.floor(s / 3600)} ghante pehle`);
   const d = Math.floor(s / 86400);
-  return d === 1 ? "kal" : `${d} din pehle`;
+  return d === 1 ? t("yesterday", "kal") : t(`${d} days ago`, `${d} din pehle`);
 }
 
 export function uptime(secs: number): string {
   const d = Math.floor(secs / 86400), h = Math.floor((secs % 86400) / 3600);
-  return d > 0 ? `${d} din ${h} ghante` : `${h} ghante`;
+  return d > 0 ? t(`${d}d ${h}h`, `${d} din ${h} ghante`) : t(`${h}h`, `${h} ghante`);
 }
 
 export function shortPath(p: string, max = 64): string {

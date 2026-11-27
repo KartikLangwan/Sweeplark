@@ -3,7 +3,7 @@
   import Icon from "./components/Icon.svelte";
   import mark from "./assets/mark.svg";
   import { api, on } from "./lib/api";
-  import { applyTheme, go, refreshInbox, ui, type Page } from "./lib/state.svelte";
+  import { applyTheme, go, refreshInbox, t, ui, type Page } from "./lib/state.svelte";
   import Home from "./pages/Home.svelte";
   import Clean from "./pages/Clean.svelte";
   import Startup from "./pages/Startup.svelte";
@@ -13,16 +13,16 @@
   import History from "./pages/History.svelte";
   import SettingsPage from "./pages/Settings.svelte";
 
-  const nav: { id: Page; label: string; icon: string }[] = [
-    { id: "home", label: "Home", icon: "home" },
-    { id: "clean", label: "Safai", icon: "broom" },
-    { id: "startup", label: "Startup", icon: "rocket" },
-    { id: "health", label: "Sehat", icon: "pulse" },
-    { id: "assistant", label: "Assistant", icon: "chat" },
-    { id: "inbox", label: "Messages", icon: "inbox" },
-    { id: "history", label: "Hisaab", icon: "history" },
-    { id: "settings", label: "Settings", icon: "settings" },
-  ];
+  const nav = $derived<{ id: Page; label: string; icon: string }[]>([
+    { id: "home", label: t("Home", "Home"), icon: "home" },
+    { id: "clean", label: t("Clean", "Safai"), icon: "broom" },
+    { id: "startup", label: t("Startup", "Startup"), icon: "rocket" },
+    { id: "health", label: t("Health", "Sehat"), icon: "pulse" },
+    { id: "assistant", label: t("Assistant", "Assistant"), icon: "chat" },
+    { id: "inbox", label: t("Messages", "Messages"), icon: "inbox" },
+    { id: "history", label: t("History", "Hisaab"), icon: "history" },
+    { id: "settings", label: t("Settings", "Settings"), icon: "settings" },
+  ]);
 
   onMount(() => {
     try {
@@ -63,11 +63,11 @@
       {/each}
     </nav>
     <div class="foot">
-      <div class="local"><Icon name="lock" size={15} /><span>100% offline · koi tracking nahi</span></div>
+      <div class="local"><Icon name="lock" size={14} /><span>{t("Offline · no tracking", "Offline · koi tracking nahi")}</span></div>
       <div class="row">
-        <span class="muted small">v{ui.info?.version ?? "0.1.0"}</span>
+        <span class="muted small">v{ui.info?.version ?? "1.1.0"}</span>
         <span class="spacer"></span>
-        <button class="btn ghost small" onclick={cycleTheme} title="Theme: {ui.theme}" aria-label="Theme badlein">
+        <button class="btn ghost small" onclick={cycleTheme} title="Theme: {ui.theme}" aria-label={t("Change theme", "Theme badlein")}>
           <Icon name={ui.theme === "dark" ? "moon" : ui.theme === "light" ? "sun" : "sparkle"} size={16} />
         </button>
       </div>
@@ -100,7 +100,7 @@
   .shell { display: grid; grid-template-columns: 232px 1fr; height: 100vh; }
   aside {
     display: flex; flex-direction: column; gap: 18px; padding: 20px 14px 14px;
-    background: var(--surface); border-right: 1px solid var(--line);
+    background: var(--bg); border-right: 1px solid var(--line);
   }
   .brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 4px; }
   .brand strong { display: block; font-size: 21px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.05; }
@@ -112,17 +112,18 @@
     background: transparent; color: var(--ink-2); cursor: pointer; font-weight: 520; text-align: left; position: relative;
   }
   .nav-item:hover { background: var(--surface-3); }
-  .nav-item.active { background: var(--teal-soft); color: var(--teal-text); font-weight: 620; }
-  .nav-item.active::before { content: ""; position: absolute; left: -14px; top: 9px; bottom: 9px; width: 3px; border-radius: 0 3px 3px 0; background: var(--teal); }
+  .nav-item { border: 1px solid transparent; }
+  .nav-item.active { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: var(--shadow); border: 1px solid var(--line); }
+  .nav-item.active :global(svg) { color: var(--teal); }
   .nav-item em { margin-left: auto; font-style: normal; font-size: 11px; font-weight: 700; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; display: grid; place-items: center; background: var(--teal); color: #fff; }
   .nav-item em.amber { background: var(--amber); color: #3a2500; }
   .foot { margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding: 0 6px; }
-  .local { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--teal-text); background: var(--teal-soft); padding: 8px 10px; border-radius: 10px; }
+  .local { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--slate); padding: 4px 6px; }
   main {
     overflow: auto; position: relative;
-    background: radial-gradient(1200px 500px at 90% -10%, var(--bg-glow), transparent 60%), var(--bg);
+    background: var(--surface-2);
   }
-  .page { max-width: 1120px; margin: 0 auto; padding: 28px 32px 40px; }
+  .page { max-width: 1080px; margin: 0 auto; padding: 32px 36px 48px; }
   .toasts { position: fixed; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 60; }
   .toast { display: flex; align-items: center; gap: 9px; padding: 11px 16px; border-radius: 12px; background: var(--ink); color: var(--bg); box-shadow: var(--shadow-lg); font-weight: 520; max-width: 420px; }
   .toast.good :global(svg) { color: var(--mint); }

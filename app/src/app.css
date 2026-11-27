@@ -2,84 +2,83 @@
 
 /* Sweeplark brand: Lark Teal #0FB5AE, Fresh Mint #7DE8C8, Ink #0B1B33, Amber #FFB039,
    Soft Mint #F2FBF8, Slate #5B6B80. */
+/* Soft, minimal theme on the Sweeplark palette:
+   Lark Teal #0FB5AE · Fresh Mint #7DE8C8 · Ink #0B1B33 · Amber #FFB039 · Soft Mint #F2FBF8 · Slate #5B6B80 */
 :root {
-  --bg: #f2fbf8;
-  --bg-glow: #dff6ee;
+  --bg: #f6faf9;
   --surface: #ffffff;
-  --surface-2: #f6fcfa;
-  --surface-3: #e8f6f1;
-  --line: #d9efe8;
-  --line-strong: #bfe3d8;
+  --surface-2: #f8fbfa;
+  --surface-3: #eef5f3;
+  --line: #e5eeeb;
+  --line-strong: #d3e3de;
   --ink: #0b1b33;
-  --ink-2: #2a3a52;
-  --slate: #5b6b80;
+  --ink-2: #33445c;
+  --slate: #6a7a8e;
   --teal: #0fb5ae;
-  --teal-strong: #0a9a95;
-  --teal-text: #08807b;
-  --teal-soft: #d8f5ee;
+  --teal-strong: #0b9f99;
+  --teal-text: #0a8a85;
+  --teal-soft: #e6f7f3;
   --mint: #7de8c8;
   --amber: #ffb039;
-  --amber-soft: #fff2dc;
-  --amber-text: #9a5b00;
+  --amber-soft: #fff5e3;
+  --amber-text: #94570a;
   --red: #e5484d;
-  --red-soft: #fde8e8;
+  --red-soft: #fdeeee;
   --red-text: #b4232a;
   --good: #12a17a;
-  --good-soft: #dcf5ec;
-  --shadow: 0 1px 2px rgba(11, 27, 51, 0.05), 0 6px 24px rgba(11, 27, 51, 0.06);
-  --shadow-lg: 0 24px 64px rgba(11, 27, 51, 0.18);
-  --radius: 16px;
-  --radius-sm: 10px;
+  --good-soft: #e5f6ef;
+  --shadow: 0 1px 2px rgba(11, 27, 51, 0.04);
+  --shadow-lg: 0 20px 50px rgba(11, 27, 51, 0.14);
+  --radius: 14px;
+  --radius-sm: 9px;
   --font: "Outfit Variable", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
   color-scheme: light;
 }
 
 :root[data-theme="dark"] {
-  --bg: #0a1628;
-  --bg-glow: #0f2a3a;
-  --surface: #10223b;
-  --surface-2: #132844;
-  --surface-3: #18324f;
-  --line: #1f3a5c;
-  --line-strong: #2a4b72;
-  --ink: #eaf6f3;
-  --ink-2: #c9d9e6;
-  --slate: #93a7bd;
-  --teal: #19c3bb;
-  --teal-strong: #2fd3c8;
-  --teal-text: #4fe0cd;
-  --teal-soft: #113c45;
-  --amber-soft: #3a2c12;
-  --amber-text: #ffc566;
-  --red-soft: #3d1a22;
-  --red-text: #ff8a8f;
-  --good-soft: #0f3a33;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 24px rgba(0, 0, 0, 0.25);
+  --bg: #0d1625;
+  --surface: #131e30;
+  --surface-2: #162236;
+  --surface-3: #1b2940;
+  --line: #213149;
+  --line-strong: #2b3e5a;
+  --ink: #e8f1f0;
+  --ink-2: #c3d0dc;
+  --slate: #8d9db1;
+  --teal: #22c3ba;
+  --teal-strong: #39d2c8;
+  --teal-text: #5adfcf;
+  --teal-soft: #15343a;
+  --amber-soft: #33291a;
+  --amber-text: #ffc871;
+  --red-soft: #35202a;
+  --red-text: #ff9196;
+  --good-soft: #143430;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
   color-scheme: dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0a1628;
-    --bg-glow: #0f2a3a;
-    --surface: #10223b;
-    --surface-2: #132844;
-    --surface-3: #18324f;
-    --line: #1f3a5c;
-    --line-strong: #2a4b72;
-    --ink: #eaf6f3;
-    --ink-2: #c9d9e6;
-    --slate: #93a7bd;
-    --teal: #19c3bb;
-    --teal-strong: #2fd3c8;
-    --teal-text: #4fe0cd;
-    --teal-soft: #113c45;
-    --amber-soft: #3a2c12;
-    --amber-text: #ffc566;
-    --red-soft: #3d1a22;
-    --red-text: #ff8a8f;
-    --good-soft: #0f3a33;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 24px rgba(0, 0, 0, 0.25);
+    --bg: #0d1625;
+    --surface: #131e30;
+    --surface-2: #162236;
+    --surface-3: #1b2940;
+    --line: #213149;
+    --line-strong: #2b3e5a;
+    --ink: #e8f1f0;
+    --ink-2: #c3d0dc;
+    --slate: #8d9db1;
+    --teal: #22c3ba;
+    --teal-strong: #39d2c8;
+    --teal-text: #5adfcf;
+    --teal-soft: #15343a;
+    --amber-soft: #33291a;
+    --amber-text: #ffc871;
+    --red-soft: #35202a;
+    --red-text: #ff9196;
+    --good-soft: #143430;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
     color-scheme: dark;
   }
 }
@@ -102,8 +101,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .selectable { user-select: text; }
 
 h1, h2, h3 { margin: 0; letter-spacing: -0.01em; }
-h1 { font-size: 26px; font-weight: 650; }
-h2 { font-size: 18px; font-weight: 620; }
+h1 { font-size: 24px; font-weight: 600; }
+h2 { font-size: 17px; font-weight: 600; }
 h3 { font-size: 15px; font-weight: 600; }
 p { margin: 0; }
 .muted { color: var(--slate); }
@@ -123,7 +122,7 @@ p { margin: 0; }
   border: 1px solid var(--line);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  padding: 18px;
+  padding: 20px;
 }
 .card.flat { box-shadow: none; }
 .card-title { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
@@ -133,15 +132,15 @@ p { margin: 0; }
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   height: 38px; padding: 0 16px; border-radius: 999px;
   border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink);
-  font-weight: 560; cursor: pointer; transition: background 0.15s, border-color 0.15s, transform 0.05s, box-shadow 0.15s;
+  font-weight: 520; cursor: pointer; transition: background 0.15s, border-color 0.15s, transform 0.05s, box-shadow 0.15s;
   white-space: nowrap;
 }
 .btn:hover { background: var(--surface-3); }
 .btn:active { transform: translateY(1px); }
 .btn:disabled { opacity: 0.5; cursor: default; transform: none; }
-.btn.primary { background: var(--teal); border-color: var(--teal); color: #fff; box-shadow: 0 6px 18px rgba(15, 181, 174, 0.28); }
+.btn.primary { background: var(--teal); border-color: var(--teal); color: #fff; }
 .btn.primary:hover { background: var(--teal-strong); border-color: var(--teal-strong); }
-.btn.big { height: 52px; padding: 0 28px; font-size: 16px; }
+.btn.big { height: 46px; padding: 0 24px; font-size: 15px; }
 .btn.small { height: 30px; padding: 0 12px; font-size: 12.5px; }
 .btn.ghost { border-color: transparent; background: transparent; }
 .btn.ghost:hover { background: var(--surface-3); }
@@ -175,9 +174,9 @@ input[type="checkbox"] { width: 17px; height: 17px; accent-color: var(--teal); c
 .list > .item:first-child { border-top: 0; }
 
 /* Progress bar */
-.bar { height: 8px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
-.bar > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--teal), var(--mint)); transition: width 0.4s; }
-.bar.amber > span { background: linear-gradient(90deg, #ff9f1a, var(--amber)); }
+.bar { height: 6px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
+.bar > span { display: block; height: 100%; border-radius: 999px; background: var(--teal); transition: width 0.4s; }
+.bar.amber > span { background: var(--amber); }
 .bar.red > span { background: var(--red); }
 
 .empty { text-align: center; padding: 36px 16px; color: var(--slate); }

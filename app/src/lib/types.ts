@@ -102,7 +102,7 @@ export interface Settings {
   privacy_consent: boolean;
   disabled_cleaners: string[];
   enabled_cleaners: string[];
-  language: string;
+  language: "en" | "hinglish";
   agent: {
     enabled: boolean; start_with_windows: boolean; sample_minutes: number;
     daily_summary: string | null; weekly_summary: { weekday: number; time: string } | null;
