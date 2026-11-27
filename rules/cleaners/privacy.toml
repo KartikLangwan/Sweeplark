@@ -1,0 +1,89 @@
+# Browsing data. All off by default, need the user's one-time consent, and always ask before running.
+
+[[cleaner]]
+id = "chrome.history"
+name = "Chrome history"
+description = "Chrome mein kholi gayi websites ki list."
+category = "privacy"
+risk = "ask"
+privacy = true
+default_enabled = false
+running = ["chrome.exe"]
+note = "History wapas nahi aayegi. Bookmarks aur passwords nahi hatenge."
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Google/Chrome/User Data/*"
+recursive = false
+include = ["History", "History-journal", "Visited Links", "Top Sites", "Top Sites-journal"]
+
+[[cleaner]]
+id = "chrome.cookies"
+name = "Chrome cookies"
+description = "Websites ki cookies."
+category = "privacy"
+risk = "ask"
+privacy = true
+default_enabled = false
+running = ["chrome.exe"]
+note = "Aap saari websites se logout ho jayenge."
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Google/Chrome/User Data/*/Network"
+recursive = false
+include = ["Cookies", "Cookies-journal"]
+
+[[cleaner]]
+id = "edge.history"
+name = "Edge history"
+description = "Edge mein kholi gayi websites ki list."
+category = "privacy"
+risk = "ask"
+privacy = true
+default_enabled = false
+running = ["msedge.exe"]
+note = "History wapas nahi aayegi. Favorites aur passwords nahi hatenge."
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Microsoft/Edge/User Data/*"
+recursive = false
+include = ["History", "History-journal", "Visited Links", "Top Sites", "Top Sites-journal"]
+
+[[cleaner]]
+id = "edge.cookies"
+name = "Edge cookies"
+description = "Websites ki cookies."
+category = "privacy"
+risk = "ask"
+privacy = true
+default_enabled = false
+running = ["msedge.exe"]
+note = "Aap saari websites se logout ho jayenge."
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Microsoft/Edge/User Data/*/Network"
+recursive = false
+include = ["Cookies", "Cookies-journal"]
+
+[[cleaner]]
+id = "firefox.cookies"
+name = "Firefox cookies"
+description = "Websites ki cookies."
+category = "privacy"
+risk = "ask"
+privacy = true
+default_enabled = false
+running = ["firefox.exe"]
+note = "Aap saari websites se logout ho jayenge."
+[[cleaner.target]]
+path = "%APPDATA%/Mozilla/Firefox/Profiles/*"
+recursive = false
+include = ["cookies.sqlite", "cookies.sqlite-wal", "cookies.sqlite-shm"]
+
+[[cleaner]]
+id = "windows.recent_files"
+name = "Recent files ki list"
+description = "Explorer mein haal mein kholi gayi files ki list. Files khud safe rahengi."
+category = "privacy"
+risk = "ask"
+privacy = true
+default_enabled = false
+[[cleaner.target]]
+path = "%APPDATA%/Microsoft/Windows/Recent"
+recursive = false
+include = ["*.lnk"]

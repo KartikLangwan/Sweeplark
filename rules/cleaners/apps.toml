@@ -1,0 +1,52 @@
+# App caches (Electron apps etc.). Settings, chats and logins are not touched.
+
+[[cleaner]]
+id = "discord.cache"
+name = "Discord cache"
+description = "Images aur media ki cached files. Chats aur login safe rahenge."
+category = "apps"
+risk = "safe"
+running = ["discord.exe"]
+[[cleaner.target]]
+path = "%APPDATA%/discord/Cache"
+[[cleaner.target]]
+path = "%APPDATA%/discord/Code Cache"
+[[cleaner.target]]
+path = "%APPDATA%/discord/GPUCache"
+
+[[cleaner]]
+id = "teams.classic.cache"
+name = "Microsoft Teams (classic) cache"
+description = "Teams ki cached files. Chats aur login safe rahenge."
+category = "apps"
+risk = "safe"
+running = ["teams.exe"]
+[[cleaner.target]]
+path = "%APPDATA%/Microsoft/Teams/Cache"
+[[cleaner.target]]
+path = "%APPDATA%/Microsoft/Teams/Code Cache"
+[[cleaner.target]]
+path = "%APPDATA%/Microsoft/Teams/GPUCache"
+
+[[cleaner]]
+id = "slack.cache"
+name = "Slack cache"
+description = "Slack ki cached files. Chats aur login safe rahenge."
+category = "apps"
+risk = "safe"
+running = ["slack.exe"]
+[[cleaner.target]]
+path = "%APPDATA%/Slack/Cache"
+[[cleaner.target]]
+path = "%APPDATA%/Slack/Code Cache"
+[[cleaner.target]]
+path = "%APPDATA%/Slack/GPUCache"
+
+[[cleaner]]
+id = "java.cache"
+name = "Java cache"
+description = "Java applets aur Web Start ki downloaded files."
+category = "apps"
+risk = "safe"
+[[cleaner.target]]
+path = "%USERPROFILE%/AppData/LocalLow/Sun/Java/Deployment/cache"

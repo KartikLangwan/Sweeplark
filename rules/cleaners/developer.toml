@@ -1,0 +1,113 @@
+# Developer tool caches. Off by default: they can be big, but deleting them means
+# downloading packages again (costs data on metered connections).
+
+[[cleaner]]
+id = "dev.vscode.cache"
+name = "VS Code cache"
+description = "VS Code ki cached files. Settings aur extensions safe rahenge."
+category = "developer"
+risk = "safe"
+running = ["code.exe"]
+[[cleaner.target]]
+path = "%APPDATA%/Code/Cache"
+[[cleaner.target]]
+path = "%APPDATA%/Code/CachedData"
+[[cleaner.target]]
+path = "%APPDATA%/Code/Code Cache"
+[[cleaner.target]]
+path = "%APPDATA%/Code/GPUCache"
+[[cleaner.target]]
+path = "%APPDATA%/Code/CachedExtensionVSIXs"
+
+[[cleaner]]
+id = "dev.npm.cache"
+name = "npm cache"
+description = "Node.js packages ki downloaded copies."
+category = "developer"
+risk = "ask"
+default_enabled = false
+note = "Agli install par packages dobara download honge."
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/npm-cache/_cacache"
+min_age_hours = 24
+remove_empty_dirs = true
+
+[[cleaner]]
+id = "dev.yarn.cache"
+name = "Yarn cache"
+description = "Yarn packages ki downloaded copies."
+category = "developer"
+risk = "ask"
+default_enabled = false
+note = "Agli install par packages dobara download honge."
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Yarn/Cache"
+min_age_hours = 24
+remove_empty_dirs = true
+
+[[cleaner]]
+id = "dev.pip.cache"
+name = "pip cache"
+description = "Python packages ki downloaded copies."
+category = "developer"
+risk = "ask"
+default_enabled = false
+note = "Agli install par packages dobara download honge."
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/pip/cache"
+min_age_hours = 24
+remove_empty_dirs = true
+
+[[cleaner]]
+id = "dev.nuget.cache"
+name = "NuGet HTTP cache"
+description = ".NET packages ka download cache."
+category = "developer"
+risk = "ask"
+default_enabled = false
+note = "Agli restore par packages dobara download honge."
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/NuGet/v3-cache"
+min_age_hours = 24
+remove_empty_dirs = true
+
+[[cleaner]]
+id = "dev.gradle.cache"
+name = "Gradle cache"
+description = "Gradle builds ka download aur build cache."
+category = "developer"
+risk = "ask"
+default_enabled = false
+running = ["java.exe", "studio64.exe"]
+note = "Agla build dheema hoga aur dependencies dobara download hongi."
+[[cleaner.target]]
+path = "%USERPROFILE%/.gradle/caches"
+min_age_hours = 24
+remove_empty_dirs = true
+
+[[cleaner]]
+id = "dev.cargo.cache"
+name = "Cargo download cache"
+description = "Rust crates ki downloaded .crate files."
+category = "developer"
+risk = "ask"
+default_enabled = false
+running = ["cargo.exe"]
+note = "Agle build par crates dobara download honge."
+[[cleaner.target]]
+path = "%USERPROFILE%/.cargo/registry/cache"
+min_age_hours = 24
+
+[[cleaner]]
+id = "dev.go.cache"
+name = "Go build cache"
+description = "Go compiler ka build cache."
+category = "developer"
+risk = "ask"
+default_enabled = false
+running = ["go.exe"]
+note = "Agla build dheema hoga."
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/go-build"
+min_age_hours = 24
+remove_empty_dirs = true

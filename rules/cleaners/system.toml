@@ -1,0 +1,148 @@
+# Sweeplark cleaner rules: Windows system.
+# Format: docs/RULES.md. Paths use forward slashes; %VAR% = environment variable; * = any folder name.
+
+[[cleaner]]
+id = "windows.temp.user"
+name = "Temp files (aapke)"
+description = "Apps ki chhodi hui temporary files. 24 ghante se purani files hi hatengi; documents, photos jaisi files aapse pooch kar."
+category = "system"
+risk = "safe"
+inspect = true
+[[cleaner.target]]
+path = "%TEMP%"
+min_age_hours = 24
+remove_empty_dirs = true
+
+[[cleaner]]
+id = "windows.temp.system"
+name = "Temp files (Windows)"
+description = "Windows ke Temp folder ki purani files."
+category = "system"
+risk = "safe"
+needs_admin = true
+inspect = true
+[[cleaner.target]]
+path = "%SystemRoot%/Temp"
+min_age_hours = 24
+remove_empty_dirs = true
+
+[[cleaner]]
+id = "windows.thumbnails"
+name = "Thumbnail cache"
+description = "Photos aur videos ke chhote preview. Windows zarurat padne par dobara bana leta hai."
+category = "system"
+risk = "safe"
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Microsoft/Windows/Explorer"
+recursive = false
+include = ["thumbcache_*.db"]
+
+[[cleaner]]
+id = "windows.crash_dumps.user"
+name = "Crash dumps (apps)"
+description = "Apps crash hone par bani memory dump files. Sirf developers ke kaam ki."
+category = "logs"
+risk = "safe"
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/CrashDumps"
+include = ["**/*.dmp"]
+
+[[cleaner]]
+id = "windows.crash_dumps.system"
+name = "Crash dumps (Windows)"
+description = "Blue screen ke baad bani chhoti dump files (Minidump)."
+category = "logs"
+risk = "safe"
+needs_admin = true
+[[cleaner.target]]
+path = "%SystemRoot%/Minidump"
+include = ["**/*.dmp"]
+
+[[cleaner]]
+id = "windows.error_reports.user"
+name = "Error reports (aapke)"
+description = "Windows Error Reporting ki purani reports jo bheji ja chuki hain ya bekaar hain."
+category = "logs"
+risk = "safe"
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Microsoft/Windows/WER"
+remove_empty_dirs = true
+
+[[cleaner]]
+id = "windows.error_reports.system"
+name = "Error reports (Windows)"
+description = "Poore system ki Windows Error Reporting files."
+category = "logs"
+risk = "safe"
+needs_admin = true
+[[cleaner.target]]
+path = "%ProgramData%/Microsoft/Windows/WER/ReportArchive"
+remove_empty_dirs = true
+[[cleaner.target]]
+path = "%ProgramData%/Microsoft/Windows/WER/ReportQueue"
+remove_empty_dirs = true
+[[cleaner.target]]
+path = "%ProgramData%/Microsoft/Windows/WER/Temp"
+remove_empty_dirs = true
+
+[[cleaner]]
+id = "windows.update.downloads"
+name = "Windows Update ka bacha data"
+description = "Install ho chuke updates ki downloaded files."
+category = "system"
+risk = "ask"
+needs_admin = true
+note = "Agar abhi update download ya install ho raha ho toh pehle use poora hone dein. 3 din se nayi files nahi hatengi."
+[[cleaner.target]]
+path = "%SystemRoot%/SoftwareDistribution/Download"
+min_age_hours = 72
+remove_empty_dirs = true
+
+[[cleaner]]
+id = "windows.delivery_optimization"
+name = "Delivery Optimization cache"
+description = "Updates ko doosre PCs se share karne ke liye rakhi gayi files."
+category = "system"
+risk = "ask"
+needs_admin = true
+[[cleaner.target]]
+path = "%SystemRoot%/ServiceProfiles/NetworkService/AppData/Local/Microsoft/Windows/DeliveryOptimization/Cache"
+min_age_hours = 24
+remove_empty_dirs = true
+
+[[cleaner]]
+id = "windows.logs.cbs"
+name = "Purane Windows logs"
+description = "CBS aur DISM ke 30 din se purane log files."
+category = "logs"
+risk = "ask"
+needs_admin = true
+[[cleaner.target]]
+path = "%SystemRoot%/Logs/CBS"
+include = ["*.log", "*.cab"]
+min_age_hours = 720
+[[cleaner.target]]
+path = "%SystemRoot%/Logs/DISM"
+include = ["*.log"]
+min_age_hours = 720
+
+[[cleaner]]
+id = "windows.inet_cache"
+name = "Windows internet cache"
+description = "Purane Internet Explorer aur Windows components ka web cache."
+category = "browser"
+risk = "safe"
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Microsoft/Windows/INetCache"
+min_age_hours = 1
+remove_empty_dirs = true
+
+[[cleaner]]
+id = "windows.recycle_bin"
+name = "Recycle Bin (purani cheezein)"
+description = "Recycle Bin mein Settings mein chune gaye dinon se purani padi files. Nayi files wahin rahengi."
+category = "recycle_bin"
+risk = "ask"
+note = "Recycle Bin se hatayi files wapas nahi aatin."
+[[cleaner.target]]
+kind = "recycle_bin"

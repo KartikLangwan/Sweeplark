@@ -1,0 +1,95 @@
+# Browser caches. Only cache: no history, passwords, cookies or bookmarks (those are in privacy.toml).
+
+[[cleaner]]
+id = "chrome.cache"
+name = "Google Chrome cache"
+description = "Websites ki cached files. Login aur history safe rahenge."
+category = "browser"
+risk = "safe"
+running = ["chrome.exe"]
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Google/Chrome/User Data/*/Cache"
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Google/Chrome/User Data/*/Code Cache"
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Google/Chrome/User Data/*/GPUCache"
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Google/Chrome/User Data/ShaderCache"
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Google/Chrome/User Data/GrShaderCache"
+
+[[cleaner]]
+id = "edge.cache"
+name = "Microsoft Edge cache"
+description = "Websites ki cached files. Login aur history safe rahenge."
+category = "browser"
+risk = "safe"
+running = ["msedge.exe"]
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Microsoft/Edge/User Data/*/Cache"
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Microsoft/Edge/User Data/*/Code Cache"
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Microsoft/Edge/User Data/*/GPUCache"
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Microsoft/Edge/User Data/ShaderCache"
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Microsoft/Edge/User Data/GrShaderCache"
+
+[[cleaner]]
+id = "brave.cache"
+name = "Brave cache"
+description = "Websites ki cached files. Login aur history safe rahenge."
+category = "browser"
+risk = "safe"
+running = ["brave.exe"]
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/BraveSoftware/Brave-Browser/User Data/*/Cache"
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/BraveSoftware/Brave-Browser/User Data/*/Code Cache"
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/BraveSoftware/Brave-Browser/User Data/*/GPUCache"
+
+[[cleaner]]
+id = "vivaldi.cache"
+name = "Vivaldi cache"
+description = "Websites ki cached files. Login aur history safe rahenge."
+category = "browser"
+risk = "safe"
+running = ["vivaldi.exe"]
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Vivaldi/User Data/*/Cache"
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Vivaldi/User Data/*/Code Cache"
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Vivaldi/User Data/*/GPUCache"
+
+[[cleaner]]
+id = "opera.cache"
+name = "Opera / Opera GX cache"
+description = "Websites ki cached files. Login aur history safe rahenge."
+category = "browser"
+risk = "safe"
+running = ["opera.exe"]
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Opera Software/Opera Stable/Cache"
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Opera Software/Opera GX Stable/Cache"
+[[cleaner.target]]
+path = "%APPDATA%/Opera Software/Opera Stable/Code Cache"
+[[cleaner.target]]
+path = "%APPDATA%/Opera Software/Opera GX Stable/Code Cache"
+
+[[cleaner]]
+id = "firefox.cache"
+name = "Firefox cache"
+description = "Websites ki cached files. Login, history aur bookmarks safe rahenge."
+category = "browser"
+risk = "safe"
+running = ["firefox.exe"]
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Mozilla/Firefox/Profiles/*/cache2"
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Mozilla/Firefox/Profiles/*/startupCache"
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Mozilla/Firefox/Profiles/*/thumbnails"
