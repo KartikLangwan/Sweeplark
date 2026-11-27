@@ -2,13 +2,22 @@
 //! always introduces itself by the product's name.
 
 use super::catalog::AnswerStyle;
+use crate::Lang;
 use crate::branding::APP_NAME;
 
 const BUTTONS: &str = "App buttons: \"Clean\" deletes junk files and frees disk space (it does NOT free RAM). \
 \"Startup\" stops apps from starting with Windows. \"Health\" shows details. \
 To free RAM the user closes heavy apps or restarts the PC.";
 
-pub fn chat_system(style: AnswerStyle, key_points: &[String], facts: &str) -> String {
+fn language_rule(lang: Lang) -> &'static str {
+    match lang {
+        Lang::En => "Reply in English. If the user writes in Hinglish (Hindi in English letters) or Hindi, reply in that language.",
+        Lang::Hinglish => "Reply in simple Hinglish (Hindi in English letters). If the user writes in English, reply in English.",
+    }
+}
+
+pub fn chat_system(style: AnswerStyle, key_points: &[String], facts: &str, lang: Lang) -> String {
+    let language = language_rule(lang);
     let length = match style {
         AnswerStyle::Brief => "Write only 1 or 2 short sentences. Do not list steps; the app shows them below your answer.",
         AnswerStyle::Full => "Answer in at most 3 short bullet points. Start with the most important point.",
@@ -22,7 +31,7 @@ pub fn chat_system(style: AnswerStyle, key_points: &[String], facts: &str) -> St
         "You are {APP_NAME}, the offline assistant inside the {APP_NAME} app on this Windows PC. \
 {APP_NAME} cleans junk files, manages startup apps and watches PC health. Everything runs on this PC; nothing goes to the internet.
 Rules:
-- Reply in the user's language. If they write Hinglish (Hindi in English letters), reply in simple Hinglish.
+- {language}
 - Use only the facts below and keep numbers exactly as written. If something is not in the facts, say you don't know.
 - You cannot change anything yourself; you can only suggest.
 - {BUTTONS}
@@ -39,10 +48,14 @@ PC FACTS (measured just now):
 }
 
 /// For notifications and daily/weekly summaries.
-pub fn narrate_system(kind: &str, points: &[String], facts: &str) -> String {
+pub fn narrate_system(kind: &str, points: &[String], facts: &str, lang: Lang) -> String {
+    let language = match lang {
+        Lang::En => "in plain English",
+        Lang::Hinglish => "in simple Hinglish (Hindi in English letters)",
+    };
     format!(
-        "You are {APP_NAME}, the offline assistant of the {APP_NAME} PC care app. Write a {kind} for the user in simple \
-Hinglish (Hindi in English letters): 2 or 3 short, friendly sentences. Use only the points and facts below, keep numbers \
+        "You are {APP_NAME}, the offline assistant of the {APP_NAME} PC care app. Write a {kind} for the user {language}: \
+2 or 3 short, friendly sentences. Use only the points and facts below, keep numbers \
 exactly as written, do not invent anything, do not give more than one suggestion. {BUTTONS}
 
 POINTS:
@@ -75,7 +88,7 @@ mod tests {
 
     #[test]
     fn prompt_names_the_app_and_facts() {
-        let p = chat_system(AnswerStyle::Brief, &["RAM 91% bhari hai".into()], "RAM 91% used");
+        let p = chat_system(AnswerStyle::Brief, &["RAM 91% bhari hai".into()], "RAM 91% used", Lang::En);
         assert!(p.contains(&format!("You are {APP_NAME}")));
         assert!(p.contains("RAM 91% bhari hai"));
         assert!(p.contains("1 or 2 short sentences"));

@@ -3,8 +3,10 @@
 
 [[cleaner]]
 id = "windows.temp.user"
-name = "Temp files (aapke)"
-description = "Apps ki chhodi hui temporary files. 24 ghante se purani files hi hatengi; documents, photos jaisi files aapse pooch kar."
+name = "Temporary files (yours)"
+name_hi = "Temp files (aapke)"
+description = "Temporary files left by apps. Only files older than 24 hours; documents and photos are kept for your approval."
+description_hi = "Apps ki chhodi hui temporary files. 24 ghante se purani files hi hatengi; documents, photos jaisi files aapse pooch kar."
 category = "system"
 risk = "safe"
 inspect = true
@@ -15,8 +17,10 @@ remove_empty_dirs = true
 
 [[cleaner]]
 id = "windows.temp.system"
-name = "Temp files (Windows)"
-description = "Windows ke Temp folder ki purani files."
+name = "Temporary files (Windows)"
+name_hi = "Temp files (Windows)"
+description = "Old files in the Windows Temp folder."
+description_hi = "Windows ke Temp folder ki purani files."
 category = "system"
 risk = "safe"
 needs_admin = true
@@ -29,7 +33,8 @@ remove_empty_dirs = true
 [[cleaner]]
 id = "windows.thumbnails"
 name = "Thumbnail cache"
-description = "Photos aur videos ke chhote preview. Windows zarurat padne par dobara bana leta hai."
+description = "Small previews of photos and videos. Windows rebuilds them when needed."
+description_hi = "Photos aur videos ke chhote preview. Windows zarurat padne par dobara bana leta hai."
 category = "system"
 risk = "safe"
 [[cleaner.target]]
@@ -40,7 +45,8 @@ include = ["thumbcache_*.db"]
 [[cleaner]]
 id = "windows.crash_dumps.user"
 name = "Crash dumps (apps)"
-description = "Apps crash hone par bani memory dump files. Sirf developers ke kaam ki."
+description = "Memory dumps created when apps crash. Only useful to developers."
+description_hi = "Apps crash hone par bani memory dump files. Sirf developers ke kaam ki."
 category = "logs"
 risk = "safe"
 [[cleaner.target]]
@@ -50,7 +56,8 @@ include = ["**/*.dmp"]
 [[cleaner]]
 id = "windows.crash_dumps.system"
 name = "Crash dumps (Windows)"
-description = "Blue screen ke baad bani chhoti dump files (Minidump)."
+description = "Small dump files created after a blue screen (Minidump)."
+description_hi = "Blue screen ke baad bani chhoti dump files (Minidump)."
 category = "logs"
 risk = "safe"
 needs_admin = true
@@ -60,8 +67,10 @@ include = ["**/*.dmp"]
 
 [[cleaner]]
 id = "windows.error_reports.user"
-name = "Error reports (aapke)"
-description = "Windows Error Reporting ki purani reports jo bheji ja chuki hain ya bekaar hain."
+name = "Error reports (yours)"
+name_hi = "Error reports (aapke)"
+description = "Old Windows Error Reporting files that were already sent or are no longer needed."
+description_hi = "Windows Error Reporting ki purani reports jo bheji ja chuki hain ya bekaar hain."
 category = "logs"
 risk = "safe"
 [[cleaner.target]]
@@ -71,7 +80,8 @@ remove_empty_dirs = true
 [[cleaner]]
 id = "windows.error_reports.system"
 name = "Error reports (Windows)"
-description = "Poore system ki Windows Error Reporting files."
+description = "System-wide Windows Error Reporting files."
+description_hi = "Poore system ki Windows Error Reporting files."
 category = "logs"
 risk = "safe"
 needs_admin = true
@@ -87,12 +97,15 @@ remove_empty_dirs = true
 
 [[cleaner]]
 id = "windows.update.downloads"
-name = "Windows Update ka bacha data"
-description = "Install ho chuke updates ki downloaded files."
+name = "Windows Update leftovers"
+name_hi = "Windows Update ka bacha data"
+description = "Downloaded files of updates that are already installed."
+description_hi = "Install ho chuke updates ki downloaded files."
 category = "system"
 risk = "ask"
 needs_admin = true
-note = "Agar abhi update download ya install ho raha ho toh pehle use poora hone dein. 3 din se nayi files nahi hatengi."
+note = "If an update is downloading or installing right now, let it finish first. Files newer than 3 days are kept."
+note_hi = "Agar abhi update download ya install ho raha ho toh pehle use poora hone dein. 3 din se nayi files nahi hatengi."
 [[cleaner.target]]
 path = "%SystemRoot%/SoftwareDistribution/Download"
 min_age_hours = 72
@@ -101,7 +114,8 @@ remove_empty_dirs = true
 [[cleaner]]
 id = "windows.delivery_optimization"
 name = "Delivery Optimization cache"
-description = "Updates ko doosre PCs se share karne ke liye rakhi gayi files."
+description = "Files kept to share updates with other PCs."
+description_hi = "Updates ko doosre PCs se share karne ke liye rakhi gayi files."
 category = "system"
 risk = "ask"
 needs_admin = true
@@ -112,8 +126,10 @@ remove_empty_dirs = true
 
 [[cleaner]]
 id = "windows.logs.cbs"
-name = "Purane Windows logs"
-description = "CBS aur DISM ke 30 din se purane log files."
+name = "Old Windows logs"
+name_hi = "Purane Windows logs"
+description = "CBS and DISM log files older than 30 days."
+description_hi = "CBS aur DISM ke 30 din se purane log files."
 category = "logs"
 risk = "ask"
 needs_admin = true
@@ -129,7 +145,8 @@ min_age_hours = 720
 [[cleaner]]
 id = "windows.inet_cache"
 name = "Windows internet cache"
-description = "Purane Internet Explorer aur Windows components ka web cache."
+description = "Web cache of old Internet Explorer and Windows components."
+description_hi = "Purane Internet Explorer aur Windows components ka web cache."
 category = "browser"
 risk = "safe"
 [[cleaner.target]]
@@ -139,10 +156,13 @@ remove_empty_dirs = true
 
 [[cleaner]]
 id = "windows.recycle_bin"
-name = "Recycle Bin (purani cheezein)"
-description = "Recycle Bin mein Settings mein chune gaye dinon se purani padi files. Nayi files wahin rahengi."
+name = "Recycle Bin (old items)"
+name_hi = "Recycle Bin (purani cheezein)"
+description = "Items in the Recycle Bin older than the days set in Settings. Recent items stay."
+description_hi = "Recycle Bin mein Settings mein chune gaye dinon se purani padi files. Nayi files wahin rahengi."
 category = "recycle_bin"
 risk = "ask"
-note = "Recycle Bin se hatayi files wapas nahi aatin."
+note = "Items removed from the Recycle Bin cannot be restored."
+note_hi = "Recycle Bin se hatayi files wapas nahi aatin."
 [[cleaner.target]]
 kind = "recycle_bin"

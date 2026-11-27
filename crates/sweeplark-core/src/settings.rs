@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 use crate::ai::catalog::Tier;
-use crate::{Result, TrustLevel};
+use crate::{Lang, Result, TrustLevel};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
@@ -19,7 +19,7 @@ pub struct Settings {
     pub disabled_cleaners: Vec<String>,
     /// Cleaner ids (normally off by default) the user turned on.
     pub enabled_cleaners: Vec<String>,
-    pub language: String,
+    pub language: Lang,
     pub agent: AgentSettings,
     pub ai: AiSettings,
 }
@@ -147,7 +147,7 @@ impl Default for Settings {
             privacy_consent: false,
             disabled_cleaners: Vec::new(),
             enabled_cleaners: Vec::new(),
-            language: "hinglish".into(),
+            language: Lang::En,
             agent: AgentSettings::default(),
             ai: AiSettings::default(),
         }

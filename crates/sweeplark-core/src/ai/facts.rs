@@ -84,6 +84,7 @@ pub trait PcSource {
 /// Facts gathered lazily: each source is read at most once per question.
 pub struct Facts<'a> {
     src: &'a dyn PcSource,
+    pub lang: crate::Lang,
     health: OnceCell<HealthSnapshot>,
     scan: OnceCell<Option<ScanReport>>,
     startup: OnceCell<Vec<StartupItem>>,
@@ -95,8 +96,8 @@ fn gb(bytes: u64) -> String {
 }
 
 impl<'a> Facts<'a> {
-    pub fn new(src: &'a dyn PcSource) -> Self {
-        Self { src, health: OnceCell::new(), scan: OnceCell::new(), startup: OnceCell::new(), history: OnceCell::new() }
+    pub fn new(src: &'a dyn PcSource, lang: crate::Lang) -> Self {
+        Self { src, lang, health: OnceCell::new(), scan: OnceCell::new(), startup: OnceCell::new(), history: OnceCell::new() }
     }
 
     pub fn health(&self) -> &HealthSnapshot {
@@ -117,7 +118,7 @@ impl<'a> Facts<'a> {
 
     /// Problems found, using whatever facts are already loaded (plus health and startup).
     pub fn findings(&self) -> Vec<Finding> {
-        advisor::analyze(self.health(), self.scan.get().and_then(|s| s.as_ref()), Some(self.startup()))
+        advisor::analyze(self.health(), self.scan.get().and_then(|s| s.as_ref()), Some(self.startup()), self.lang)
     }
 
     /// Run one tool and describe the result in a few short lines.
@@ -345,7 +346,7 @@ mod tests {
     #[test]
     fn tools_describe_facts() {
         let pc = FakePc;
-        let f = Facts::new(&pc);
+        let f = Facts::new(&pc, crate::Lang::En);
         assert!(f.run(Tool::Specs).contains("Intel Core i3-1005G1"));
         let perf = f.run(Tool::Performance);
         assert!(perf.contains("RAM 91% used"), "{perf}");

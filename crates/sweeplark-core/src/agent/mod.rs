@@ -163,7 +163,7 @@ impl Agent<'_> {
             all_seen.extend(current);
             self.store.set_state("startup_seen", &serde_json::to_string(&all_seen)?)?;
 
-            for alert in triggers::evaluate(&recent, slow.as_ref(), &new_names) {
+            for alert in triggers::evaluate(&recent, slow.as_ref(), &new_names, s.language) {
                 if !self.cooled_down(&alert.key, alert.cooldown_hours, now)? {
                     continue;
                 }
@@ -203,16 +203,30 @@ impl Agent<'_> {
             };
             rep.auto_clean = true;
             if let Some(res) = &outcome.cleaned {
-                let title = format!("{} jagah khaali ki", crate::util::format_bytes(res.freed_bytes));
-                let body = format!("{} bekaar files hatayi. Personal files ko haath nahi lagaya.", res.deleted_files);
+                let (freed, n) = (crate::util::format_bytes(res.freed_bytes), res.deleted_files);
+                let title = crate::tr!(s.language, "Freed {freed}", "{freed} jagah khaali ki");
+                let body = crate::tr!(
+                    s.language,
+                    "Removed {n} junk files. Personal files were not touched.",
+                    "{n} bekaar files hatayi. Personal files ko haath nahi lagaya."
+                );
                 self.deliver(s, host, now, MessageKind::Cleanup, &title, &body, None, serde_json::to_value(res)?)?;
             }
             if let Some((title, detail)) = &outcome.approval {
                 let id = self.store.add_approval(title, &serde_json::to_value(detail)?)?;
-                let body = if detail.risky_files.is_empty() {
-                    "Dekh kar haan ya na kahein. Aapki ijazat ke bina kuch delete nahi hoga.".to_string()
+                let n = detail.risky_files.len();
+                let body = if n == 0 {
+                    crate::tr!(
+                        s.language,
+                        "Take a look and say yes or no. Nothing is deleted without your approval.",
+                        "Dekh kar haan ya na kahein. Aapki ijazat ke bina kuch delete nahi hoga."
+                    )
                 } else {
-                    format!("{} files documents/photos jaisi lagti hain; unhe aap ek-ek karke chun sakte hain.", detail.risky_files.len())
+                    crate::tr!(
+                        s.language,
+                        "{n} files look like documents or photos; you can pick them one by one.",
+                        "{n} files documents/photos jaisi lagti hain; unhe aap ek-ek karke chun sakte hain."
+                    )
                 };
                 self.deliver(s, host, now, MessageKind::Approval, title, &body, None, serde_json::json!({ "approval_id": id }))?;
                 rep.approval_id = Some(id);
@@ -245,7 +259,7 @@ impl Agent<'_> {
                 .filter(|m| m.kind == MessageKind::Alert && m.at >= from)
                 .count() as u32;
             let sum = summary::build(from, now, &samples, &changes, alerts);
-            let (title, body, points) = sum.render(weekly);
+            let (title, body, points) = sum.render(weekly, s.language);
             let ai = if s.ai.enabled && s.ai.write_summaries {
                 host.narrate(if weekly { "weekly summary" } else { "daily summary" }, &points, &body)
             } else {
@@ -323,7 +337,7 @@ mod tests {
         if local(now - Duration::minutes(2)).date_naive() == local(now).date_naive() {
             assert!(r.daily);
             assert_eq!(host.narrated, 1);
-            assert!(host.notes.iter().any(|(t, b)| t == "Aaj ki report" && b == "AI ne likha"));
+            assert!(host.notes.iter().any(|(t, b)| t == "Today's report" && b == "AI ne likha"));
         }
         assert!(r.sampled);
         assert_eq!(host.released, 1);

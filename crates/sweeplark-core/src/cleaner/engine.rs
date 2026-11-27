@@ -29,6 +29,8 @@ pub struct ScanContext {
     pub env: EnvLookup,
     pub recycle_dirs: Vec<PathBuf>,
     pub recycle_min_age_hours: u64,
+    /// Language for cleaner names and descriptions in the preview.
+    pub lang: crate::Lang,
 }
 
 impl ScanContext {
@@ -42,6 +44,7 @@ impl ScanContext {
             env: Box::new(crate::paths::env_lookup),
             recycle_dirs: recycle::current_user_recycle_dirs(),
             recycle_min_age_hours: u64::from(settings.recycle_bin_min_age_days) * 24,
+            lang: settings.language,
         }
     }
 }
@@ -368,13 +371,13 @@ fn wanted(def: &CleanerDef, opts: &ScanOptions) -> bool {
 pub fn scan_cleaner(def: &CleanerDef, ctx: &ScanContext) -> CleanerPreview {
     let mut preview = CleanerPreview {
         id: def.id.clone(),
-        name: def.name.clone(),
-        description: def.description.clone(),
+        name: ctx.lang.pick_opt(&def.name, def.name_hi.as_deref()).to_string(),
+        description: ctx.lang.pick_opt(&def.description, def.description_hi.as_deref()).to_string(),
         category: def.category,
         risk: def.risk,
         needs_admin: def.needs_admin,
         privacy: def.privacy,
-        note: def.note.clone(),
+        note: def.note.as_deref().map(|n| ctx.lang.pick_opt(n, def.note_hi.as_deref()).to_string()),
         status: PreviewStatus::Empty,
         files: 0,
         bytes: 0,
@@ -683,6 +686,7 @@ mod tests {
                 }),
                 recycle_dirs: Vec::new(),
                 recycle_min_age_hours: 0,
+                lang: crate::Lang::En,
             }
         }
 

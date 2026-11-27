@@ -5,6 +5,7 @@ use serde::Serialize;
 use super::store::Sample;
 use crate::health::HealthSnapshot;
 use crate::util::format_bytes;
+use crate::{Lang, tr};
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Alert {
@@ -20,38 +21,61 @@ pub struct Alert {
 /// How many recent samples a problem must last for (3 × 5 min = 15 min).
 pub const SUSTAIN: usize = 3;
 
-pub fn evaluate(recent: &[Sample], health: Option<&HealthSnapshot>, new_startup: &[String]) -> Vec<Alert> {
+pub fn evaluate(recent: &[Sample], health: Option<&HealthSnapshot>, new_startup: &[String], lang: Lang) -> Vec<Alert> {
     let mut out = Vec::new();
     let last: Vec<&Sample> = recent.iter().rev().take(SUSTAIN).collect();
 
     if last.len() == SUSTAIN && last.iter().all(|s| s.ram_percent >= 90.0) {
         let s = last[0];
+        let ram = s.ram_percent;
         let app = s.top_ram_app.as_ref().map(|(n, b)| format!("{n} ({})", format_bytes(*b)));
+        let mut points = vec![tr!(lang, "RAM {ram:.0}% full for 15 minutes", "RAM {ram:.0}% bhari, 15 minute se")];
+        if let Some(a) = &app {
+            points.push(tr!(lang, "Most RAM: {a}", "Sabse zyada RAM: {a}"));
+        }
         out.push(Alert {
             key: "ram.high".into(),
             cooldown_hours: 4,
-            title: format!("RAM {:.0}% bhari hai", s.ram_percent),
+            title: tr!(lang, "RAM is {ram:.0}% full", "RAM {ram:.0}% bhari hai"),
             body: match &app {
-                Some(a) => format!("15 minute se RAM lagbhag poori bhari hai. Sabse zyada {a} le raha hai. Jo kaam mein nahi hai use band karein."),
-                None => "15 minute se RAM lagbhag poori bhari hai. Jo apps kaam mein nahi hain unhe band karein.".into(),
+                Some(a) => tr!(
+                    lang,
+                    "RAM has been almost full for 15 minutes. {a} is using the most. Close what you are not using.",
+                    "15 minute se RAM lagbhag poori bhari hai. Sabse zyada {a} le raha hai. Jo kaam mein nahi hai use band karein."
+                ),
+                None => tr!(
+                    lang,
+                    "RAM has been almost full for 15 minutes. Close apps you are not using.",
+                    "15 minute se RAM lagbhag poori bhari hai. Jo apps kaam mein nahi hain unhe band karein."
+                ),
             },
-            points: vec![format!("RAM {:.0}% bhari, 15 minute se", s.ram_percent)].into_iter().chain(app.map(|a| format!("Sabse zyada RAM: {a}"))).collect(),
+            points,
         });
     }
 
     if last.len() == SUSTAIN && last.iter().all(|s| s.cpu_percent >= 85.0) {
         let apps: Vec<&str> = last.iter().filter_map(|s| s.top_cpu_app.as_ref().map(|(n, _)| n.as_str())).collect();
         let same = !apps.is_empty() && apps.iter().all(|a| *a == apps[0]);
+        let cpu = last[0].cpu_percent;
         out.push(Alert {
             key: "cpu.high".into(),
             cooldown_hours: 2,
-            title: "CPU der se poori taakat par chal raha hai".into(),
+            title: tr!(lang, "CPU has been at full power for a while", "CPU der se poori taakat par chal raha hai"),
             body: if same {
-                format!("Pichhle 15 minute se {} CPU sabse zyada le raha hai. Agar yeh aap nahi chala rahe toh ise band karein.", apps[0])
+                let a = apps[0];
+                tr!(
+                    lang,
+                    "{a} has used the most CPU for the last 15 minutes. If you are not using it, close it.",
+                    "Pichhle 15 minute se {a} CPU sabse zyada le raha hai. Agar yeh aap nahi chala rahe toh ise band karein."
+                )
             } else {
-                "Pichhle 15 minute se CPU 85% se upar hai. PC garam aur dheema ho sakta hai.".into()
+                tr!(
+                    lang,
+                    "CPU has been above 85% for 15 minutes. The PC may get hot and slow.",
+                    "Pichhle 15 minute se CPU 85% se upar hai. PC garam aur dheema ho sakta hai."
+                )
             },
-            points: vec![format!("CPU {:.0}%, 15 minute se", last[0].cpu_percent)],
+            points: vec![tr!(lang, "CPU {cpu:.0}% for 15 minutes", "CPU {cpu:.0}%, 15 minute se")],
         });
     }
 
@@ -60,12 +84,17 @@ pub fn evaluate(recent: &[Sample], health: Option<&HealthSnapshot>, new_startup:
     {
         let free_pct = s.system_free as f64 / s.system_total as f64 * 100.0;
         if free_pct < 10.0 {
+            let free = format_bytes(s.system_free);
             out.push(Alert {
                 key: "disk.low".into(),
                 cooldown_hours: 24,
-                title: format!("System drive mein sirf {} bacha hai", format_bytes(s.system_free)),
-                body: "Jagah kam hone se Windows dheema hota hai aur updates fail ho sakte hain. Clean chala kar jagah banayein.".into(),
-                points: vec![format!("{} khaali ({free_pct:.0}%)", format_bytes(s.system_free))],
+                title: tr!(lang, "Only {free} left on the system drive", "System drive mein sirf {free} bacha hai"),
+                body: tr!(
+                    lang,
+                    "Low space slows Windows down and can make updates fail. Run a cleanup to free space.",
+                    "Jagah kam hone se Windows dheema hota hai aur updates fail ho sakte hain. Clean chala kar jagah banayein."
+                ),
+                points: vec![tr!(lang, "{free} free ({free_pct:.0}%)", "{free} khaali ({free_pct:.0}%)")],
             });
         }
     }
@@ -74,9 +103,13 @@ pub fn evaluate(recent: &[Sample], health: Option<&HealthSnapshot>, new_startup:
         out.push(Alert {
             key: format!("startup.new.{}", name.to_lowercase()),
             cooldown_hours: 24 * 365,
-            title: format!("Nayi startup app: {name}"),
-            body: format!("{name} ab Windows ke saath apne aap chalegi. Agar aapne ise nahi joda ya roz zarurat nahi, toh Startup mein band kar sakte hain."),
-            points: vec![format!("{name} startup mein judi")],
+            title: tr!(lang, "New startup app: {name}", "Nayi startup app: {name}"),
+            body: tr!(
+                lang,
+                "{name} will now start with Windows. If you didn't add it or don't need it every day, you can turn it off in Startup.",
+                "{name} ab Windows ke saath apne aap chalegi. Agar aapne ise nahi joda ya roz zarurat nahi, toh Startup mein band kar sakte hain."
+            ),
+            points: vec![tr!(lang, "{name} added to startup", "{name} startup mein judi")],
         });
     }
 
@@ -86,9 +119,13 @@ pub fn evaluate(recent: &[Sample], health: Option<&HealthSnapshot>, new_startup:
         out.push(Alert {
             key: "security.off".into(),
             cooldown_hours: 24,
-            title: "PC ki suraksha mein kami".into(),
-            body: "Defender real-time protection ya Firewall band hai. Agar koi doosra antivirus nahi hai toh ise chalu karein.".into(),
-            points: vec!["Defender ya firewall band".into()],
+            title: tr!(lang, "Your PC's protection is weakened", "PC ki suraksha mein kami"),
+            body: tr!(
+                lang,
+                "Defender real-time protection or the firewall is off. If you don't have another antivirus, turn it on.",
+                "Defender real-time protection ya Firewall band hai. Agar koi doosra antivirus nahi hai toh ise chalu karein."
+            ),
+            points: vec![tr!(lang, "Defender or firewall off", "Defender ya firewall band")],
         });
     }
     out
@@ -114,8 +151,8 @@ mod tests {
 
     #[test]
     fn needs_sustained_problem() {
-        assert!(evaluate(&[s(95.0, 10.0, 50), s(50.0, 10.0, 50), s(95.0, 10.0, 50)], None, &[]).is_empty());
-        let a = evaluate(&[s(95.0, 90.0, 50), s(92.0, 90.0, 50), s(91.0, 90.0, 5)], None, &["Spotify".into()]);
+        assert!(evaluate(&[s(95.0, 10.0, 50), s(50.0, 10.0, 50), s(95.0, 10.0, 50)], None, &[], Lang::En).is_empty());
+        let a = evaluate(&[s(95.0, 90.0, 50), s(92.0, 90.0, 50), s(91.0, 90.0, 5)], None, &["Spotify".into()], Lang::En);
         let keys: Vec<&str> = a.iter().map(|x| x.key.as_str()).collect();
         assert_eq!(keys, vec!["ram.high", "cpu.high", "disk.low", "startup.new.spotify"]);
         assert!(a[0].body.contains("chrome"));

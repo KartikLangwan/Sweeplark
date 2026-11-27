@@ -131,13 +131,15 @@ pub fn run(
     detail.total_bytes =
         detail.cleaners.iter().map(|c| c.bytes).sum::<u64>() + detail.risky_files.iter().map(|f| f.bytes).sum::<u64>();
     if !detail.cleaners.is_empty() || !detail.risky_files.is_empty() {
-        let title = if detail.risky_files.is_empty() {
-            format!("{} saaf karne ki ijazat chahiye", format_bytes(detail.total_bytes))
+        let (size, n) = (format_bytes(detail.total_bytes), detail.risky_files.len());
+        let lang = settings.language;
+        let title = if n == 0 {
+            crate::tr!(lang, "Approve cleaning {size}?", "{size} saaf karne ki ijazat chahiye")
         } else {
-            format!(
-                "{} saaf karne ki ijazat chahiye ({} files aapki ho sakti hain)",
-                format_bytes(detail.total_bytes),
-                detail.risky_files.len()
+            crate::tr!(
+                lang,
+                "Approve cleaning {size}? ({n} files may be yours)",
+                "{size} saaf karne ki ijazat chahiye ({n} files aapki ho sakti hain)"
             )
         };
         out.approval = Some((title, detail));

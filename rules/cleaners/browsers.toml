@@ -3,7 +3,8 @@
 [[cleaner]]
 id = "chrome.cache"
 name = "Google Chrome cache"
-description = "Websites ki cached files. Login aur history safe rahenge."
+description = "Cached website files. Logins and history stay safe."
+description_hi = "Websites ki cached files. Login aur history safe rahenge."
 category = "browser"
 risk = "safe"
 running = ["chrome.exe"]
@@ -21,7 +22,8 @@ path = "%LOCALAPPDATA%/Google/Chrome/User Data/GrShaderCache"
 [[cleaner]]
 id = "edge.cache"
 name = "Microsoft Edge cache"
-description = "Websites ki cached files. Login aur history safe rahenge."
+description = "Cached website files. Logins and history stay safe."
+description_hi = "Websites ki cached files. Login aur history safe rahenge."
 category = "browser"
 risk = "safe"
 running = ["msedge.exe"]
@@ -39,7 +41,8 @@ path = "%LOCALAPPDATA%/Microsoft/Edge/User Data/GrShaderCache"
 [[cleaner]]
 id = "brave.cache"
 name = "Brave cache"
-description = "Websites ki cached files. Login aur history safe rahenge."
+description = "Cached website files. Logins and history stay safe."
+description_hi = "Websites ki cached files. Login aur history safe rahenge."
 category = "browser"
 risk = "safe"
 running = ["brave.exe"]
@@ -53,7 +56,8 @@ path = "%LOCALAPPDATA%/BraveSoftware/Brave-Browser/User Data/*/GPUCache"
 [[cleaner]]
 id = "vivaldi.cache"
 name = "Vivaldi cache"
-description = "Websites ki cached files. Login aur history safe rahenge."
+description = "Cached website files. Logins and history stay safe."
+description_hi = "Websites ki cached files. Login aur history safe rahenge."
 category = "browser"
 risk = "safe"
 running = ["vivaldi.exe"]
@@ -67,7 +71,8 @@ path = "%LOCALAPPDATA%/Vivaldi/User Data/*/GPUCache"
 [[cleaner]]
 id = "opera.cache"
 name = "Opera / Opera GX cache"
-description = "Websites ki cached files. Login aur history safe rahenge."
+description = "Cached website files. Logins and history stay safe."
+description_hi = "Websites ki cached files. Login aur history safe rahenge."
 category = "browser"
 risk = "safe"
 running = ["opera.exe"]
@@ -83,7 +88,8 @@ path = "%APPDATA%/Opera Software/Opera GX Stable/Code Cache"
 [[cleaner]]
 id = "firefox.cache"
 name = "Firefox cache"
-description = "Websites ki cached files. Login, history aur bookmarks safe rahenge."
+description = "Cached website files. Logins, history and bookmarks stay safe."
+description_hi = "Websites ki cached files. Login, history aur bookmarks safe rahenge."
 category = "browser"
 risk = "safe"
 running = ["firefox.exe"]

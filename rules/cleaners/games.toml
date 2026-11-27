@@ -3,7 +3,8 @@
 [[cleaner]]
 id = "steam.webcache"
 name = "Steam web cache"
-description = "Steam store aur community pages ki cached files. Games safe rahenge."
+description = "Cached Steam store and community pages. Games stay safe."
+description_hi = "Steam store aur community pages ki cached files. Games safe rahenge."
 category = "games"
 risk = "safe"
 running = ["steam.exe", "steamwebhelper.exe"]
@@ -13,7 +14,8 @@ path = "%LOCALAPPDATA%/Steam/htmlcache"
 [[cleaner]]
 id = "epic.webcache"
 name = "Epic Games Launcher cache"
-description = "Launcher ki web cache aur purane logs. Games safe rahenge."
+description = "Launcher web cache and old logs. Games stay safe."
+description_hi = "Launcher ki web cache aur purane logs. Games safe rahenge."
 category = "games"
 risk = "safe"
 running = ["epicgameslauncher.exe"]
@@ -26,7 +28,8 @@ min_age_hours = 24
 [[cleaner]]
 id = "battlenet.cache"
 name = "Battle.net cache"
-description = "Battle.net launcher ki cached files."
+description = "Cached files of the Battle.net launcher."
+description_hi = "Battle.net launcher ki cached files."
 category = "games"
 risk = "safe"
 running = ["battle.net.exe"]
@@ -38,20 +41,24 @@ path = "%LOCALAPPDATA%/Battle.net/BrowserCache"
 [[cleaner]]
 id = "gpu.shader_cache.directx"
 name = "DirectX shader cache"
-description = "Games ke compile kiye shaders. Game agli baar inhe dobara banayega."
+description = "Shaders compiled by games. Games rebuild them next time."
+description_hi = "Games ke compile kiye shaders. Game agli baar inhe dobara banayega."
 category = "games"
 risk = "ask"
-note = "Pehli baar game kholne par thodi der atak (stutter) aa sakti hai."
+note = "Games may stutter briefly the first time you open them."
+note_hi = "Pehli baar game kholne par thodi der atak (stutter) aa sakti hai."
 [[cleaner.target]]
 path = "%LOCALAPPDATA%/D3DSCache"
 
 [[cleaner]]
 id = "gpu.shader_cache.nvidia"
 name = "NVIDIA shader cache"
-description = "NVIDIA driver ke compile kiye shaders."
+description = "Shaders compiled by the NVIDIA driver."
+description_hi = "NVIDIA driver ke compile kiye shaders."
 category = "games"
 risk = "ask"
-note = "Pehli baar game kholne par thodi der atak (stutter) aa sakti hai."
+note = "Games may stutter briefly the first time you open them."
+note_hi = "Pehli baar game kholne par thodi der atak (stutter) aa sakti hai."
 [[cleaner.target]]
 path = "%LOCALAPPDATA%/NVIDIA/DXCache"
 [[cleaner.target]]
@@ -62,10 +69,12 @@ path = "%USERPROFILE%/AppData/LocalLow/NVIDIA/PerDriverVersion/DXCache"
 [[cleaner]]
 id = "gpu.shader_cache.amd"
 name = "AMD shader cache"
-description = "AMD driver ke compile kiye shaders."
+description = "Shaders compiled by the AMD driver."
+description_hi = "AMD driver ke compile kiye shaders."
 category = "games"
 risk = "ask"
-note = "Pehli baar game kholne par thodi der atak (stutter) aa sakti hai."
+note = "Games may stutter briefly the first time you open them."
+note_hi = "Pehli baar game kholne par thodi der atak (stutter) aa sakti hai."
 [[cleaner.target]]
 path = "%LOCALAPPDATA%/AMD/DxCache"
 [[cleaner.target]]

@@ -54,7 +54,7 @@ fn model_answers_reviews_and_unloads() {
 
     let pc = RealPc;
     for q in ["mera pc slow kyun hai?", "tum kaun ho?", "is my pc safe from virus?"] {
-        let facts = Facts::new(&pc);
+        let facts = Facts::new(&pc, sweeplark_core::Lang::Hinglish);
         let t = Instant::now();
         let mut streamed = String::new();
         let r = ai::answer(q, &[], &facts, Some((&server.client, &spec)), &mut |p| {
@@ -83,7 +83,7 @@ fn model_answers_reviews_and_unloads() {
 
     let narr = ai::narrate(&server.client, "daily summary",
         &["Aaj 1.2 GB junk saaf hua".into(), "RAM sabse zyada 91% tak gayi (chrome)".into()],
-        "freed 1.2 GB; RAM peak 91%; top app chrome");
+        "freed 1.2 GB; RAM peak 91%; top app chrome", sweeplark_core::Lang::Hinglish);
     println!("\nnarration: {narr:?}");
 
     drop(server);

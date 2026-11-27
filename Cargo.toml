@@ -1,13 +1,15 @@
 [workspace]
 resolver = "3"
-members = ["crates/sweeplark-core", "crates/sweeplark-cli"]
+members = ["crates/sweeplark-core", "crates/sweeplark-cli", "app/src-tauri"]
+# The desktop app needs WebView2 (Windows); build it explicitly with -p sweeplark-app.
+default-members = ["crates/sweeplark-core", "crates/sweeplark-cli"]
 
 [workspace.package]
-version = "0.1.0"
+version = "1.1.0"
 edition = "2024"
 license = "GPL-3.0-or-later"
 repository = ""
-authors = ["Sweeplark contributors"]
+authors = []
 
 [workspace.dependencies]
 sweeplark-core = { path = "crates/sweeplark-core" }

@@ -9,7 +9,7 @@ use crate::cleaner::ScanReport;
 use crate::health::HealthSnapshot;
 use crate::startup::{Advice, StartupItem};
 use crate::util::format_bytes;
-use crate::Risk;
+use crate::{Lang, Risk, tr};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -68,7 +68,12 @@ fn list_apps(apps: &[(String, String)]) -> String {
 }
 
 /// Look at everything and list what deserves attention, most serious first.
-pub fn analyze(health: &HealthSnapshot, scan: Option<&ScanReport>, startup: Option<&[StartupItem]>) -> Vec<Finding> {
+pub fn analyze(
+    health: &HealthSnapshot,
+    scan: Option<&ScanReport>,
+    startup: Option<&[StartupItem]>,
+    lang: Lang,
+) -> Vec<Finding> {
     use Severity::*;
     use Topic::*;
     let mut out = Vec::new();
@@ -83,15 +88,16 @@ pub fn analyze(health: &HealthSnapshot, scan: Option<&ScanReport>, startup: Opti
             .take(3)
             .map(|a| (a.name.clone(), format_bytes(a.memory_bytes)))
             .collect();
+        let apps = list_apps(&heavy);
         out.push(finding(
             "ram.high",
             if mem >= 90.0 { Critical } else { Warning },
             &[Performance],
-            format!("RAM {mem:.0}% bhari hai"),
-            format!(
-                "Jab RAM bhar jaati hai, Windows disk ko RAM ki tarah use karta hai aur PC dheema ho jata hai. \
-                 Sabse zyada RAM: {}. Jo kaam mein nahi hai use band kar dein.",
-                list_apps(&heavy)
+            tr!(lang, "RAM is {mem:.0}% full", "RAM {mem:.0}% bhari hai"),
+            tr!(
+                lang,
+                "When RAM is full, Windows uses the disk as memory and the PC slows down. Using the most RAM: {apps}. Close what you are not using.",
+                "Jab RAM bhar jaati hai, Windows disk ko RAM ki tarah use karta hai aur PC dheema ho jata hai. Sabse zyada RAM: {apps}. Jo kaam mein nahi hai use band kar dein."
             ),
             Some(SuggestedAction::CloseApps { apps: heavy.into_iter().map(|(n, _)| n).collect() }),
         ));
@@ -106,15 +112,17 @@ pub fn analyze(health: &HealthSnapshot, scan: Option<&ScanReport>, startup: Opti
             .take(3)
             .map(|a| (a.name.clone(), format!("{:.0}%", a.cpu_percent)))
             .collect();
+        let cpu = health.cpu_percent;
+        let apps = list_apps(&busy);
         out.push(finding(
             "cpu.high",
             Warning,
             &[Performance, Heat],
-            format!("CPU {:.0}% busy hai", health.cpu_percent),
+            tr!(lang, "CPU is {cpu:.0}% busy", "CPU {cpu:.0}% busy hai"),
             if busy.is_empty() {
-                "Processor abhi poori taakat se kaam kar raha hai.".into()
+                tr!(lang, "The processor is working at full power right now.", "Processor abhi poori taakat se kaam kar raha hai.")
             } else {
-                format!("Processor abhi poori taakat se kaam kar raha hai. Sabse zyada: {}.", list_apps(&busy))
+                tr!(lang, "The processor is working at full power. Busiest: {apps}.", "Processor abhi poori taakat se kaam kar raha hai. Sabse zyada: {apps}.")
             },
             (!busy.is_empty()).then(|| SuggestedAction::CloseApps { apps: busy.into_iter().map(|(n, _)| n).collect() }),
         ));
@@ -123,15 +131,18 @@ pub fn analyze(health: &HealthSnapshot, scan: Option<&ScanReport>, startup: Opti
     // System drive space
     if let Some(disk) = health.system_disk() {
         let free_pct = 100.0 - disk.used_percent();
+        let drive = disk.mount.trim_end_matches('\\').to_string();
+        let free = format_bytes(disk.free_bytes);
         if free_pct < 20.0 {
             out.push(finding(
                 "disk.low",
                 if free_pct < 10.0 { Critical } else { Warning },
                 &[Storage, Performance],
-                format!("{} drive mein sirf {} bacha hai", disk.mount.trim_end_matches('\\'), format_bytes(disk.free_bytes)),
-                format!(
-                    "Drive {free_pct:.0}% hi khaali hai. Windows ko updates aur temporary files ke liye jagah chahiye; \
-                     10% se kam jagah par PC dheema ho jata hai aur updates fail ho sakte hain."
+                tr!(lang, "Only {free} left on {drive}", "{drive} drive mein sirf {free} bacha hai"),
+                tr!(
+                    lang,
+                    "The drive is only {free_pct:.0}% free. Windows needs space for updates and temporary files; below 10% the PC slows down and updates can fail.",
+                    "Drive {free_pct:.0}% hi khaali hai. Windows ko updates aur temporary files ke liye jagah chahiye; 10% se kam jagah par PC dheema ho jata hai aur updates fail ho sakte hain."
                 ),
                 Some(SuggestedAction::Clean),
             ));
@@ -141,10 +152,12 @@ pub fn analyze(health: &HealthSnapshot, scan: Option<&ScanReport>, startup: Opti
                 "disk.hdd",
                 Info,
                 &[Performance, Hardware],
-                "Windows purani hard disk (HDD) par chal raha hai".into(),
-                "Software se jitna tez ho sakta hai, utna hum karenge. Par sabse bada fark SSD lagwane se padega: \
-                 PC 3 se 5 guna jaldi start hoga aur apps turant khulengi."
-                    .into(),
+                tr!(lang, "Windows runs on an older hard disk (HDD)", "Windows purani hard disk (HDD) par chal raha hai"),
+                tr!(
+                    lang,
+                    "We will make it as fast as software can, but the biggest upgrade is an SSD: the PC would start 3 to 5 times faster and apps would open instantly.",
+                    "Software se jitna tez ho sakta hai, utna hum karenge. Par sabse bada fark SSD lagwane se padega: PC 3 se 5 guna jaldi start hoga aur apps turant khulengi."
+                ),
                 None,
             ));
         }
@@ -154,12 +167,17 @@ pub fn analyze(health: &HealthSnapshot, scan: Option<&ScanReport>, startup: Opti
     if let Some(scan) = scan {
         let junk = scan.ready_bytes(Risk::Ask);
         if junk >= 200 * 1024 * 1024 {
+            let size = format_bytes(junk);
             out.push(finding(
                 "junk.found",
                 if junk >= 2 * 1024 * 1024 * 1024 { Warning } else { Info },
                 &[Storage],
-                format!("{} bekaar files mili", format_bytes(junk)),
-                "Temp files, cache aur purane logs. Inhe hatane se personal files ko kuch nahi hoga.".into(),
+                tr!(lang, "{size} of junk files found", "{size} bekaar files mili"),
+                tr!(
+                    lang,
+                    "Temporary files, caches and old logs. Removing them does not touch your personal files.",
+                    "Temp files, cache aur purane logs. Inhe hatane se personal files ko kuch nahi hoga."
+                ),
                 Some(SuggestedAction::Clean),
             ));
         }
@@ -171,20 +189,26 @@ pub fn analyze(health: &HealthSnapshot, scan: Option<&ScanReport>, startup: Opti
         let suggest: Vec<&str> =
             enabled.iter().filter(|i| i.advice == Advice::Disable).map(|i| i.name.as_str()).collect();
         if enabled.len() >= 6 || !suggest.is_empty() {
+            let n = enabled.len();
+            let names = suggest.iter().take(5).copied().collect::<Vec<_>>().join(", ");
             let detail = if suggest.is_empty() {
-                format!("{} apps PC on hote hi chalti hain. Jo roz nahi chahiye unhe band karne se PC jaldi start hoga.", enabled.len())
+                tr!(
+                    lang,
+                    "{n} apps start when the PC turns on. Turning off the ones you don't need every day makes startup faster.",
+                    "{n} apps PC on hote hi chalti hain. Jo roz nahi chahiye unhe band karne se PC jaldi start hoga."
+                )
             } else {
-                format!(
-                    "{} apps PC on hote hi chalti hain. Inhe band karna safe hai: {}. Band karne par bhi aap inhe kabhi bhi khud khol sakte hain.",
-                    enabled.len(),
-                    suggest.iter().take(5).copied().collect::<Vec<_>>().join(", ")
+                tr!(
+                    lang,
+                    "{n} apps start when the PC turns on. Safe to turn off: {names}. You can still open them yourself any time.",
+                    "{n} apps PC on hote hi chalti hain. Inhe band karna safe hai: {names}. Band karne par bhi aap inhe kabhi bhi khud khol sakte hain."
                 )
             };
             out.push(finding(
                 "startup.many",
-                if enabled.len() >= 10 { Warning } else { Info },
+                if n >= 10 { Warning } else { Info },
                 &[Performance],
-                format!("{} startup apps chalu hain", enabled.len()),
+                tr!(lang, "{n} startup apps are on", "{n} startup apps chalu hain"),
                 detail,
                 Some(SuggestedAction::ReviewStartup),
             ));
@@ -198,8 +222,12 @@ pub fn analyze(health: &HealthSnapshot, scan: Option<&ScanReport>, startup: Opti
             "uptime.long",
             Info,
             &[Performance],
-            format!("PC {days} din se restart nahi hua"),
-            "Restart karne se atki hui memory saaf hoti hai aur pending updates install hote hain.".into(),
+            tr!(lang, "The PC has not restarted in {days} days", "PC {days} din se restart nahi hua"),
+            tr!(
+                lang,
+                "A restart clears stuck memory and installs pending updates.",
+                "Restart karne se atki hui memory saaf hoti hai aur pending updates install hote hain."
+            ),
             Some(SuggestedAction::Restart),
         ));
     }
@@ -211,10 +239,12 @@ pub fn analyze(health: &HealthSnapshot, scan: Option<&ScanReport>, startup: Opti
             "ram.small",
             Info,
             &[Performance, Hardware],
-            format!("PC mein {gb:.0} GB RAM hai"),
-            "Aaj ke browsers aur apps ke liye yeh kam hai. Kam tabs khulein, startup apps kam rakhein. \
-             Ho sake toh 8 GB RAM lagwana sabse sasta upgrade hai."
-                .into(),
+            tr!(lang, "This PC has {gb:.0} GB of RAM", "PC mein {gb:.0} GB RAM hai"),
+            tr!(
+                lang,
+                "That is little for today's browsers and apps. Keep fewer tabs open and fewer startup apps. Upgrading to 8 GB is the cheapest big improvement.",
+                "Aaj ke browsers aur apps ke liye yeh kam hai. Kam tabs khulein, startup apps kam rakhein. Ho sake toh 8 GB RAM lagwana sabse sasta upgrade hai."
+            ),
             None,
         ));
     }
@@ -226,8 +256,12 @@ pub fn analyze(health: &HealthSnapshot, scan: Option<&ScanReport>, startup: Opti
                 "security.defender_off",
                 Critical,
                 &[Security],
-                "Microsoft Defender ki real-time suraksha band hai".into(),
-                "Agar aapke paas koi doosra antivirus nahi hai toh ise turant chalu karein.".into(),
+                tr!(lang, "Microsoft Defender real-time protection is off", "Microsoft Defender ki real-time suraksha band hai"),
+                tr!(
+                    lang,
+                    "If you don't have another antivirus, turn it on right away.",
+                    "Agar aapke paas koi doosra antivirus nahi hai toh ise turant chalu karein."
+                ),
                 Some(SuggestedAction::OpenWindowsSecurity),
             ));
         } else if let Some(age) = sec.defender_signature_age_days
@@ -237,19 +271,28 @@ pub fn analyze(health: &HealthSnapshot, scan: Option<&ScanReport>, startup: Opti
                 "security.signatures_old",
                 Warning,
                 &[Security],
-                format!("Antivirus ki jaankari {age} din purani hai"),
-                "Defender ko naye viruses pehchanne ke liye update chahiye. Windows Update chalayein.".into(),
+                tr!(lang, "Antivirus definitions are {age} days old", "Antivirus ki jaankari {age} din purani hai"),
+                tr!(
+                    lang,
+                    "Defender needs updates to recognise new threats. Run Windows Update.",
+                    "Defender ko naye viruses pehchanne ke liye update chahiye. Windows Update chalayein."
+                ),
                 Some(SuggestedAction::OpenWindowsSecurity),
             ));
         }
         let off: Vec<&str> = sec.firewall_profiles.iter().filter(|(_, on)| !on).map(|(n, _)| n.as_str()).collect();
         if !off.is_empty() {
+            let profiles = off.join(", ");
             out.push(finding(
                 "security.firewall_off",
                 Warning,
                 &[Security],
-                format!("Firewall band hai ({})", off.join(", ")),
-                "Firewall bahar se aane wale anjaan connections rokta hai. Ise chalu rakhein.".into(),
+                tr!(lang, "Firewall is off ({profiles})", "Firewall band hai ({profiles})"),
+                tr!(
+                    lang,
+                    "The firewall blocks unknown incoming connections. Keep it on.",
+                    "Firewall bahar se aane wale anjaan connections rokta hai. Ise chalu rakhein."
+                ),
                 Some(SuggestedAction::OpenWindowsSecurity),
             ));
         }
@@ -258,12 +301,17 @@ pub fn analyze(health: &HealthSnapshot, scan: Option<&ScanReport>, startup: Opti
     // Disk hardware health
     for d in &health.physical_disks {
         if d.health == "Warning" || d.health == "Unhealthy" {
+            let name = &d.name;
             out.push(finding(
                 "disk.health",
                 Critical,
                 &[Hardware, Storage],
-                format!("Disk '{}' kharab hone ke sanket de rahi hai", d.name),
-                "Windows ke hisaab se is disk ki sehat theek nahi hai. Zaruri files ka backup abhi le lein.".into(),
+                tr!(lang, "Disk '{name}' shows signs of failing", "Disk '{name}' kharab hone ke sanket de rahi hai"),
+                tr!(
+                    lang,
+                    "Windows reports this disk as unhealthy. Back up important files now.",
+                    "Windows ke hisaab se is disk ki sehat theek nahi hai. Zaruri files ka backup abhi le lein."
+                ),
                 Some(SuggestedAction::Backup),
             ));
         }
@@ -273,14 +321,16 @@ pub fn analyze(health: &HealthSnapshot, scan: Option<&ScanReport>, startup: Opti
     if let Some(wear) = health.battery.as_ref().and_then(|b| b.wear_percent())
         && wear >= 20.0
     {
+        let left = 100.0 - wear;
         out.push(finding(
             "battery.wear",
             if wear >= 40.0 { Warning } else { Info },
             &[Battery, Hardware],
-            format!("Battery {wear:.0}% ghis chuki hai"),
-            format!(
-                "Nayi battery ke muqable ab sirf {:.0}% charge pakadti hai. 40% se zyada ghisawat par battery badalne ka sochein.",
-                100.0 - wear
+            tr!(lang, "Battery is {wear:.0}% worn", "Battery {wear:.0}% ghis chuki hai"),
+            tr!(
+                lang,
+                "It now holds {left:.0}% of its original charge. Above 40% wear, consider replacing it.",
+                "Nayi battery ke muqable ab sirf {left:.0}% charge pakadti hai. 40% se zyada ghisawat par battery badalne ka sochein."
             ),
             None,
         ));
@@ -290,12 +340,17 @@ pub fn analyze(health: &HealthSnapshot, scan: Option<&ScanReport>, startup: Opti
     if let Some(hot) = health.temperatures.iter().max_by(|a, b| a.celsius.total_cmp(&b.celsius))
         && hot.celsius >= 90.0
     {
+        let (label, c) = (&hot.label, hot.celsius);
         out.push(finding(
             "heat.high",
             Warning,
             &[Heat, Hardware],
-            format!("{} {:.0}°C tak garam hai", hot.label, hot.celsius),
-            "Zyada garmi se PC apni speed khud kam kar deta hai. Hawa ke raaste (vents) saaf karein, laptop ko bistar par na chalayein.".into(),
+            tr!(lang, "{label} is running hot ({c:.0}°C)", "{label} {c:.0}°C tak garam hai"),
+            tr!(
+                lang,
+                "Heat makes the PC slow itself down. Clean the vents and don't use a laptop on a bed or cushion.",
+                "Zyada garmi se PC apni speed khud kam kar deta hai. Hawa ke raaste (vents) saaf karein, laptop ko bistar par na chalayein."
+            ),
             None,
         ));
     }
@@ -305,8 +360,12 @@ pub fn analyze(health: &HealthSnapshot, scan: Option<&ScanReport>, startup: Opti
             "all.good",
             Good,
             &[Performance, Storage, Security],
-            "PC ki sehat achhi hai".into(),
-            "Koi badi dikkat nahi mili. Hafte mein ek baar scan kar lena kaafi hai.".into(),
+            tr!(lang, "Your PC is in good shape", "PC ki sehat achhi hai"),
+            tr!(
+                lang,
+                "No big problems found. A quick scan once a week is enough.",
+                "Koi badi dikkat nahi mili. Hafte mein ek baar scan kar lena kaafi hai."
+            ),
             None,
         ));
     }
@@ -338,8 +397,8 @@ fn topic_for(question: &str) -> Option<Topic> {
     }
 }
 
-/// Answer a free-text question ("PC slow kyun hai?") from the findings. Offline, no AI model.
-pub fn ask(question: &str, findings: &[Finding]) -> Answer {
+/// Answer a free-text question ("Why is my PC slow?") from the findings. Offline, no AI model.
+pub fn ask(question: &str, findings: &[Finding], lang: Lang) -> Answer {
     let topic = topic_for(question);
     let relevant: Vec<Finding> = findings
         .iter()
@@ -349,30 +408,37 @@ pub fn ask(question: &str, findings: &[Finding]) -> Answer {
         .cloned()
         .collect();
     let intro = match topic {
-        Some(Topic::Performance) => "PC ke dheeme hone ki wajahein jo mujhe mili",
-        Some(Topic::Storage) => "Jagah ke baare mein",
-        Some(Topic::Security) => "Suraksha ke baare mein",
-        Some(Topic::Battery) => "Battery ke baare mein",
-        Some(Topic::Heat) => "Garmi ke baare mein",
-        Some(Topic::Hardware) | None => "Aapke PC ki sabse zaruri baatein",
+        Some(Topic::Performance) => lang.pick("Here is what is slowing your PC down", "PC ke dheeme hone ki wajahein jo mujhe mili"),
+        Some(Topic::Storage) => lang.pick("About storage space", "Jagah ke baare mein"),
+        Some(Topic::Security) => lang.pick("About security", "Suraksha ke baare mein"),
+        Some(Topic::Battery) => lang.pick("About the battery", "Battery ke baare mein"),
+        Some(Topic::Heat) => lang.pick("About heat", "Garmi ke baare mein"),
+        Some(Topic::Hardware) | None => lang.pick("The most important things about your PC", "Aapke PC ki sabse zaruri baatein"),
     };
     let text = if relevant.is_empty() {
         match topic {
-            Some(Topic::Performance) => {
-                "Abhi koi badi wajah nahi dikhi: RAM, CPU, disk aur startup sab theek hain. Agar kisi khaas app mein \
-                 dikkat hai toh use band karke dobara kholein, ya PC restart karein."
-                    .into()
-            }
-            Some(Topic::Battery) => "Battery ke baare mein koi chinta wali baat nahi mili.".into(),
-            Some(Topic::Heat) => "Temperature theek hai, ya Windows ne sensor ki jaankari nahi di.".into(),
-            _ => "Koi badi dikkat nahi mili. Sab theek lag raha hai.".into(),
+            Some(Topic::Performance) => lang
+                .pick(
+                    "I don't see a big cause right now: RAM, CPU, disk and startup all look fine. If one app is slow, close and reopen it, or restart the PC.",
+                    "Abhi koi badi wajah nahi dikhi: RAM, CPU, disk aur startup sab theek hain. Agar kisi khaas app mein dikkat hai toh use band karke dobara kholein, ya PC restart karein.",
+                )
+                .to_string(),
+            Some(Topic::Battery) => lang.pick("Nothing worrying about the battery.", "Battery ke baare mein koi chinta wali baat nahi mili.").into(),
+            Some(Topic::Heat) => lang
+                .pick("Temperatures look fine, or Windows did not report them.", "Temperature theek hai, ya Windows ne sensor ki jaankari nahi di.")
+                .into(),
+            _ => lang.pick("No big problems found. Everything looks fine.", "Koi badi dikkat nahi mili. Sab theek lag raha hai.").into(),
         }
     } else {
         let mut t = format!("{intro}:\n");
         for (i, f) in relevant.iter().enumerate() {
             t.push_str(&format!("{}. {} — {}\n", i + 1, f.title, f.detail));
         }
-        t.push_str("\nMain khud kuch delete nahi karunga. Dekh kar faisla aap karein.");
+        t.push('\n');
+        t.push_str(lang.pick(
+            "I won't delete anything myself. You decide after looking.",
+            "Main khud kuch delete nahi karunga. Dekh kar faisla aap karein.",
+        ));
         t
     };
     Answer { text, findings: relevant }
@@ -426,7 +492,7 @@ mod tests {
 
     #[test]
     fn finds_real_problems_in_order() {
-        let f = analyze(&health(), None, None);
+        let f = analyze(&health(), None, None, Lang::En);
         let ids: Vec<&str> = f.iter().map(|f| f.id.as_str()).collect();
         assert!(ids.contains(&"ram.high"));
         assert!(ids.contains(&"disk.low"));
@@ -446,21 +512,24 @@ mod tests {
         h.disks[0].kind = "SSD".into();
         h.uptime_secs = 3600;
         h.security = None;
-        let f = analyze(&h, None, None);
+        let f = analyze(&h, None, None, Lang::En);
         assert_eq!(f.len(), 1);
         assert_eq!(f[0].id, "all.good");
     }
 
     #[test]
     fn answers_by_topic() {
-        let f = analyze(&health(), None, None);
-        let a = ask("mera PC slow kyun hai?", &f);
+        let f = analyze(&health(), None, None, Lang::Hinglish);
+        let a = ask("mera PC slow kyun hai?", &f, Lang::Hinglish);
         assert!(a.findings.iter().all(|x| x.topics.contains(&Topic::Performance)));
         assert!(a.text.contains("RAM"));
-        let s = ask("virus se safe hoon?", &f);
+        let s = ask("virus se safe hoon?", &f, Lang::Hinglish);
         assert_eq!(s.findings[0].id, "security.defender_off");
-        let b = ask("battery kaisi hai", &f);
+        let b = ask("battery kaisi hai", &f, Lang::Hinglish);
         assert!(b.findings.is_empty());
         assert!(b.text.contains("Battery"));
+        let en = ask("why is my pc slow", &analyze(&health(), None, None, Lang::En), Lang::En);
+        assert!(en.text.starts_with("Here is what is slowing"));
+        assert!(en.text.contains("RAM is"));
     }
 }

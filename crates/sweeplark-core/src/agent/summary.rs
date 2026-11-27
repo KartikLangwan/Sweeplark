@@ -8,6 +8,7 @@ use serde::Serialize;
 use super::store::Sample;
 use crate::ledger::ChangeRecord;
 use crate::util::format_bytes;
+use crate::{Lang, tr};
 
 #[derive(Debug, Clone, Default, Serialize)]
 pub struct PeriodSummary {
@@ -63,33 +64,46 @@ pub fn build(from: DateTime<Utc>, to: DateTime<Utc>, samples: &[Sample], changes
 }
 
 impl PeriodSummary {
-    /// (title, body, points for the AI). Text is Hinglish and uses only measured numbers.
-    pub fn render(&self, weekly: bool) -> (String, String, Vec<String>) {
-        let when = if weekly { "Is hafte" } else { "Aaj" };
-        let title = if weekly { "Hafte ki report".to_string() } else { "Aaj ki report".to_string() };
+    /// (title, body, points for the AI). Uses only measured numbers.
+    pub fn render(&self, weekly: bool, lang: Lang) -> (String, String, Vec<String>) {
+        let title = match (weekly, lang) {
+            (true, Lang::En) => "Weekly report",
+            (true, Lang::Hinglish) => "Hafte ki report",
+            (false, Lang::En) => "Today's report",
+            (false, Lang::Hinglish) => "Aaj ki report",
+        }
+        .to_string();
+        let when_en = if weekly { "This week" } else { "Today" };
+        let when_hi = if weekly { "Is hafte" } else { "Aaj" };
         let mut points = Vec::new();
+        let (freed, n) = (format_bytes(self.freed_bytes), self.cleanups);
         if self.freed_bytes > 0 {
-            points.push(format!("{when} {} jagah khaali hui ({} safai)", format_bytes(self.freed_bytes), self.cleanups));
+            points.push(tr!(lang, "{when_en} {freed} was freed ({n} cleanups)", "{when_hi} {freed} jagah khaali hui ({n} safai)"));
         } else {
-            points.push(format!("{when} koi safai nahi hui"));
+            points.push(tr!(lang, "{when_en} no cleanup ran", "{when_hi} koi safai nahi hui"));
         }
         if self.samples > 0 {
-            let app = self.peak_ram_app.as_deref().map(|a| format!(" ({a} sabse bhari)")).unwrap_or_default();
-            points.push(format!("RAM ausat {:.0}%, sabse zyada {:.0}%{app}", self.avg_ram, self.peak_ram));
-            points.push(format!("CPU ausat {:.0}%, sabse zyada {:.0}%", self.avg_cpu, self.peak_cpu));
+            let (avg, peak) = (self.avg_ram, self.peak_ram);
+            let app = self.peak_ram_app.as_deref().map(|a| tr!(lang, " ({a} the heaviest)", " ({a} sabse bhari)")).unwrap_or_default();
+            points.push(tr!(lang, "RAM average {avg:.0}%, peak {peak:.0}%{app}", "RAM ausat {avg:.0}%, sabse zyada {peak:.0}%{app}"));
+            let (avg, peak) = (self.avg_cpu, self.peak_cpu);
+            points.push(tr!(lang, "CPU average {avg:.0}%, peak {peak:.0}%", "CPU ausat {avg:.0}%, sabse zyada {peak:.0}%"));
         }
         if let (Some(a), Some(b)) = (self.disk_free_start, self.disk_free_end) {
+            let (fa, fb) = (format_bytes(a), format_bytes(b));
             if b + 1024 * 1024 * 1024 < a {
-                points.push(format!("System drive ki khaali jagah {} se {} hui", format_bytes(a), format_bytes(b)));
+                points.push(tr!(lang, "System drive free space went from {fa} to {fb}", "System drive ki khaali jagah {fa} se {fb} hui"));
             } else {
-                points.push(format!("System drive mein {} khaali hai", format_bytes(b)));
+                points.push(tr!(lang, "{fb} free on the system drive", "System drive mein {fb} khaali hai"));
             }
         }
         if self.alerts > 0 {
-            points.push(format!("{} alert bheje gaye", self.alerts));
+            let n = self.alerts;
+            points.push(tr!(lang, "{n} alerts sent", "{n} alert bheje gaye"));
         }
         if self.changes > self.cleanups {
-            points.push(format!("{} doosre badlav (startup vagairah)", self.changes - self.cleanups));
+            let n = self.changes - self.cleanups;
+            points.push(tr!(lang, "{n} other changes (startup etc.)", "{n} doosre badlav (startup vagairah)"));
         }
         let body = points.iter().map(|p| format!("• {p}")).collect::<Vec<_>>().join("\n");
         (title, body, points)
@@ -133,10 +147,13 @@ mod tests {
         assert_eq!(s.peak_ram, 91.0);
         assert_eq!(s.peak_ram_app.as_deref(), Some("chrome"));
         assert_eq!(s.heavy_apps[0], ("chrome".to_string(), 2));
-        let (title, body, points) = s.render(false);
+        let (title, body, points) = s.render(false, Lang::Hinglish);
         assert_eq!(title, "Aaj ki report");
         assert!(body.contains("1.0 GB jagah khaali hui"));
         assert!(body.contains("40.0 GB se 35.0 GB"));
         assert!(points.len() >= 4);
+        let (title, body, _) = s.render(true, Lang::En);
+        assert_eq!(title, "Weekly report");
+        assert!(body.contains("This week 1.0 GB was freed"));
     }
 }

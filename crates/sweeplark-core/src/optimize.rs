@@ -39,8 +39,9 @@ pub fn plan(rules: &RuleSet, settings: &Settings, reg: &dyn RegistryBackend) -> 
     let ctx = ScanContext::system(settings);
     let scan = cleaner::scan(rules, &ctx, &ScanOptions::safe_only(settings));
     // One scan, safe cleaners only, so the number on screen is exactly what one click frees.
-    let startup = startup::list(reg, &StartupFolders::system(), &KnownApps::builtin()).unwrap_or_default();
-    let findings = advisor::analyze(&health, Some(&scan), Some(&startup));
+    let known = KnownApps::builtin().with_lang(settings.language);
+    let startup = startup::list(reg, &StartupFolders::system(), &known).unwrap_or_default();
+    let findings = advisor::analyze(&health, Some(&scan), Some(&startup), settings.language);
     let auto_fix_ids: Vec<String> = scan
         .cleaners
         .iter()

@@ -5,144 +5,173 @@
 [[app]]
 match = "securityhealth"
 verdict = "keep"
-note = "Windows Security ka icon aur alerts. Chalu rakhein."
+note = "Windows Security icon and alerts. Keep it on."
+note_hi = "Windows Security ka icon aur alerts. Chalu rakhein."
 
 [[app]]
 match = "windowsdefender"
 verdict = "keep"
-note = "Antivirus. Chalu rakhein."
+note = "Antivirus. Keep it on."
+note_hi = "Antivirus. Chalu rakhein."
 
 [[app]]
 match = "rtkaud"
 verdict = "keep"
-note = "Realtek audio driver. Band karne se sound ki settings kaam nahi karengi."
+note = "Realtek audio driver. Turning it off can break sound settings."
+note_hi = "Realtek audio driver. Band karne se sound ki settings kaam nahi karengi."
 
 [[app]]
 match = "realtek"
 verdict = "keep"
-note = "Realtek driver ka hissa."
+note = "Part of a Realtek driver."
+note_hi = "Realtek driver ka hissa."
 
 [[app]]
 match = "igfx"
 verdict = "keep"
 note = "Intel graphics driver."
+note_hi = "Intel graphics driver."
 
 [[app]]
 match = "synaptics"
 verdict = "keep"
-note = "Touchpad driver. Band karne se touchpad gestures ruk sakte hain."
+note = "Touchpad driver. Turning it off can stop touchpad gestures."
+note_hi = "Touchpad driver. Band karne se touchpad gestures ruk sakte hain."
 
 [[app]]
 match = "etdctrl"
 verdict = "keep"
 note = "ELAN touchpad driver."
+note_hi = "ELAN touchpad driver."
 
 [[app]]
 match = "nvbackend"
 verdict = "disable"
-note = "NVIDIA GeForce Experience ka background hissa. Game recording use nahi karte toh band kar sakte hain."
+note = "Background part of NVIDIA GeForce Experience. Safe to turn off if you don't record games."
+note_hi = "NVIDIA GeForce Experience ka background hissa. Game recording use nahi karte toh band kar sakte hain."
 
 [[app]]
 match = "nvcplui"
 verdict = "keep"
 note = "NVIDIA control panel."
+note_hi = "NVIDIA control panel."
 
 [[app]]
 match = "spotify"
 verdict = "disable"
-note = "Spotify zarurat par khud khol sakte hain."
+note = "You can open Spotify yourself when you need it."
+note_hi = "Spotify zarurat par khud khol sakte hain."
 
 [[app]]
 match = "discord"
 verdict = "disable"
-note = "Discord zarurat par khud khol sakte hain."
+note = "You can open Discord yourself when you need it."
+note_hi = "Discord zarurat par khud khol sakte hain."
 
 [[app]]
 match = "steam"
 verdict = "disable"
-note = "Steam game khelte waqt khul jayega."
+note = "Steam opens when you start a game."
+note_hi = "Steam game khelte waqt khul jayega."
 
 [[app]]
 match = "epicgameslauncher"
 verdict = "disable"
-note = "Epic launcher game khelte waqt khol lein."
+note = "Open the Epic launcher when you want to play."
+note_hi = "Epic launcher game khelte waqt khol lein."
 
 [[app]]
 match = "microsoftedgeautolaunch"
 verdict = "disable"
-note = "Edge ko pehle se chalu rakhta hai. Band karne se PC jaldi start hoga."
+note = "Keeps Edge preloaded. Turning it off makes the PC start faster."
+note_hi = "Edge ko pehle se chalu rakhta hai. Band karne se PC jaldi start hoga."
 
 [[app]]
 match = "teams"
 verdict = "disable"
-note = "Teams roz kaam ke liye zaruri nahi toh band kar sakte hain."
+note = "Turn off if you don't need Teams every day."
+note_hi = "Teams roz kaam ke liye zaruri nahi toh band kar sakte hain."
 
 [[app]]
 match = "skype"
 verdict = "disable"
-note = "Skype zarurat par khud khol sakte hain."
+note = "You can open Skype yourself when you need it."
+note_hi = "Skype zarurat par khud khol sakte hain."
 
 [[app]]
 match = "zoom"
 verdict = "disable"
-note = "Meeting link kholne par Zoom khud chal jata hai."
+note = "Zoom opens by itself when you click a meeting link."
+note_hi = "Meeting link kholne par Zoom khud chal jata hai."
 
 [[app]]
 match = "onedrive"
 verdict = "disable"
-note = "Band karne par files tab tak sync nahi hongi jab tak OneDrive khud na kholein. Backup ke liye use karte hain toh chalu rakhein."
+note = "When off, files won't sync until you open OneDrive. Keep it on if you use it for backup."
+note_hi = "Band karne par files tab tak sync nahi hongi jab tak OneDrive khud na kholein. Backup ke liye use karte hain toh chalu rakhein."
 
 [[app]]
 match = "googledrivesync"
 verdict = "disable"
-note = "Band karne par sync tab tak rukega jab tak Drive khud na kholein."
+note = "Sync pauses until you open Drive yourself."
+note_hi = "Band karne par sync tab tak rukega jab tak Drive khud na kholein."
 
 [[app]]
 match = "dropbox"
 verdict = "disable"
-note = "Band karne par sync tab tak rukega jab tak Dropbox khud na kholein."
+note = "Sync pauses until you open Dropbox yourself."
+note_hi = "Band karne par sync tab tak rukega jab tak Dropbox khud na kholein."
 
 [[app]]
 match = "adobe"
 verdict = "disable"
-note = "Adobe updater/helper. Adobe apps kholne par yeh khud chal jata hai."
+note = "Adobe updater/helper. It starts when you open an Adobe app."
+note_hi = "Adobe updater/helper. Adobe apps kholne par yeh khud chal jata hai."
 
 [[app]]
 match = "ccleaner"
 verdict = "disable"
-note = "Doosra cleaner background mein chalne ki zarurat nahi."
+note = "Another cleaner doesn't need to run in the background."
+note_hi = "Doosra cleaner background mein chalne ki zarurat nahi."
 
 [[app]]
 match = "utorrent"
 verdict = "disable"
-note = "Torrent app zarurat par khud kholein."
+note = "Open the torrent app yourself when needed."
+note_hi = "Torrent app zarurat par khud kholein."
 
 [[app]]
 match = "bittorrent"
 verdict = "disable"
-note = "Torrent app zarurat par khud kholein."
+note = "Open the torrent app yourself when needed."
+note_hi = "Torrent app zarurat par khud kholein."
 
 [[app]]
 match = "whatsapp"
 verdict = "disable"
-note = "WhatsApp zarurat par khud khol sakte hain."
+note = "You can open WhatsApp yourself when you need it."
+note_hi = "WhatsApp zarurat par khud khol sakte hain."
 
 [[app]]
 match = "telegram"
 verdict = "disable"
-note = "Telegram zarurat par khud khol sakte hain."
+note = "You can open Telegram yourself when you need it."
+note_hi = "Telegram zarurat par khud khol sakte hain."
 
 [[app]]
 match = "opera"
 verdict = "disable"
-note = "Browser ko startup mein chalane ki zarurat nahi."
+note = "A browser doesn't need to start with Windows."
+note_hi = "Browser ko startup mein chalane ki zarurat nahi."
 
 [[app]]
 match = "cortana"
 verdict = "disable"
-note = "Cortana zyadatar log use nahi karte."
+note = "Most people don't use Cortana."
+note_hi = "Cortana zyadatar log use nahi karte."
 
 [[app]]
 match = "itunes"
 verdict = "disable"
-note = "iTunes helper. iPhone connect karte waqt iTunes khol lein."
+note = "iTunes helper. Open iTunes when you connect an iPhone."
+note_hi = "iTunes helper. iPhone connect karte waqt iTunes khol lein."

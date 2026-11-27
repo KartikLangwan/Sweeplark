@@ -125,7 +125,7 @@ pub fn answer(
             actions.push(a);
         }
     }
-    let rules_text = advisor::ask(question, &findings).text;
+    let rules_text = advisor::ask(question, &findings, facts.lang).text;
     let base = AssistantReply {
         text: rules_text.clone(),
         source: ReplySource::Rules,
@@ -137,7 +137,7 @@ pub fn answer(
     let Some((client, spec)) = model else { return base };
 
     let points: Vec<String> = key_points.iter().map(|f| format!("{} — {}", f.title, f.detail)).collect();
-    let mut msgs = vec![ChatMessage::system(prompt::chat_system(spec.style, &points, &facts_text))];
+    let mut msgs = vec![ChatMessage::system(prompt::chat_system(spec.style, &points, &facts_text, facts.lang))];
     let keep = if spec.style == AnswerStyle::Brief { 2 } else { 6 };
     msgs.extend(history.iter().rev().take(keep).rev().cloned());
     msgs.push(ChatMessage::user(question));
@@ -154,9 +154,9 @@ pub fn answer(
 
 /// Short friendly text for a notification or summary. `None` if the model's text failed
 /// the guard (callers then use their own template text).
-pub fn narrate(client: &LlamaClient, kind: &str, points: &[String], facts: &str) -> Option<String> {
+pub fn narrate(client: &LlamaClient, kind: &str, points: &[String], facts: &str, lang: crate::Lang) -> Option<String> {
     let msgs = [
-        ChatMessage::system(prompt::narrate_system(kind, points, facts)),
+        ChatMessage::system(prompt::narrate_system(kind, points, facts, lang)),
         ChatMessage::user(format!("Write the {kind} now.")),
     ];
     let raw = client.chat(&msgs, &Sampling { max_tokens: 120, temperature: 0.3 }).ok()?;
@@ -171,7 +171,7 @@ mod tests {
     #[test]
     fn without_model_uses_rules_and_actions() {
         let pc = FakePc;
-        let f = Facts::new(&pc);
+        let f = Facts::new(&pc, crate::Lang::Hinglish);
         let r = answer("mera pc slow kyun hai", &[], &f, None, &mut |_| true);
         assert_eq!(r.source, ReplySource::Rules);
         assert!(r.tools.contains(&Tool::Performance));

@@ -10,7 +10,7 @@ use crate::ledger::{ChangeStatus, Ledger, NewChange};
 use crate::platform::registry::{Hive, RegValue, RegistryBackend};
 use crate::revert::RevertStep;
 use crate::util::system_time_to_filetime;
-use crate::{Error, Result, Risk};
+use crate::{Error, Lang, Result, Risk, tr};
 
 const RUN: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
 const RUN32: &str = r"Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Run";
@@ -57,12 +57,12 @@ impl StartupSource {
         self.approved_key().0.needs_admin_to_write()
     }
 
-    pub fn label(self) -> &'static str {
+    pub fn label(self, lang: Lang) -> &'static str {
         match self {
-            StartupSource::RunUser => "Registry (sirf aap)",
-            StartupSource::RunMachine | StartupSource::RunMachine32 => "Registry (sab users)",
-            StartupSource::FolderUser => "Startup folder (sirf aap)",
-            StartupSource::FolderCommon => "Startup folder (sab users)",
+            StartupSource::RunUser => lang.pick("Registry (only you)", "Registry (sirf aap)"),
+            StartupSource::RunMachine | StartupSource::RunMachine32 => lang.pick("Registry (all users)", "Registry (sab users)"),
+            StartupSource::FolderUser => lang.pick("Startup folder (only you)", "Startup folder (sirf aap)"),
+            StartupSource::FolderCommon => lang.pick("Startup folder (all users)", "Startup folder (sab users)"),
         }
     }
 }
@@ -97,6 +97,8 @@ struct KnownApp {
     pattern: String,
     verdict: Advice,
     note: String,
+    #[serde(default)]
+    note_hi: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -107,13 +109,19 @@ struct KnownFile {
 #[derive(Debug, Clone, Default)]
 pub struct KnownApps {
     apps: Vec<KnownApp>,
+    lang: Lang,
 }
 
 impl KnownApps {
     pub fn builtin() -> Self {
         let text = include_str!("../../../rules/startup/known.toml");
         let parsed: KnownFile = toml::from_str(text).expect("built-in startup rules broken");
-        Self { apps: parsed.app }
+        Self { apps: parsed.app, lang: Lang::En }
+    }
+
+    pub fn with_lang(mut self, lang: Lang) -> Self {
+        self.lang = lang;
+        self
     }
 
     fn advise(&self, name: &str, command: &str) -> (Advice, Option<String>) {
@@ -121,7 +129,7 @@ impl KnownApps {
         self.apps
             .iter()
             .find(|a| hay.contains(&a.pattern.to_lowercase()))
-            .map(|a| (a.verdict, Some(a.note.clone())))
+            .map(|a| (a.verdict, Some(self.lang.pick_opt(&a.note, a.note_hi.as_deref()).to_string())))
             .unwrap_or((Advice::Neutral, None))
     }
 }
@@ -178,7 +186,7 @@ fn make_item(
         name,
         command,
         source,
-        source_label: source.label().into(),
+        source_label: source.label(known.lang).into(),
         enabled: is_enabled(state.as_ref()),
         needs_admin: source.needs_admin(),
         advice,
@@ -255,14 +263,16 @@ pub fn set_enabled_recorded(
     item: &StartupItem,
     enabled: bool,
     is_admin: bool,
+    lang: Lang,
 ) -> Result<i64> {
     let revert = set_enabled(reg, item, enabled, is_admin)?;
+    let name = &item.name;
     ledger.record(&NewChange {
         category: "startup".into(),
         title: if enabled {
-            format!("Startup mein chalu kiya: {}", item.name)
+            tr!(lang, "Turned on at startup: {name}", "Startup mein chalu kiya: {name}")
         } else {
-            format!("Startup se band kiya: {}", item.name)
+            tr!(lang, "Turned off at startup: {name}", "Startup se band kiya: {name}")
         },
         risk: Risk::Ask,
         status: ChangeStatus::Applied,
@@ -321,7 +331,7 @@ mod tests {
         let ledger = Ledger::open_in_memory().unwrap();
         let spotify = list(&reg, &folders, &known).unwrap().into_iter().find(|i| i.name == "Spotify").unwrap();
 
-        let id = set_enabled_recorded(&reg, &ledger, &spotify, false, false).unwrap();
+        let id = set_enabled_recorded(&reg, &ledger, &spotify, false, false, Lang::En).unwrap();
         let after = list(&reg, &folders, &known).unwrap().into_iter().find(|i| i.name == "Spotify").unwrap();
         assert!(!after.enabled);
         // The Run entry itself is untouched.

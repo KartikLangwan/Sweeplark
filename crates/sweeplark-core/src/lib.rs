@@ -13,6 +13,7 @@ pub mod branding;
 pub mod cleaner;
 pub mod error;
 pub mod health;
+pub mod lang;
 pub mod ledger;
 pub mod optimize;
 pub mod paths;
@@ -25,4 +26,5 @@ pub mod startup;
 pub mod util;
 
 pub use error::{Error, Result};
+pub use lang::Lang;
 pub use risk::{Risk, TrustLevel};

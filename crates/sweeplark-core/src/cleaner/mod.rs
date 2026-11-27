@@ -69,7 +69,11 @@ pub struct Target {
 pub struct CleanerDef {
     pub id: String,
     pub name: String,
+    #[serde(default)]
+    pub name_hi: Option<String>,
     pub description: String,
+    #[serde(default)]
+    pub description_hi: Option<String>,
     pub category: Category,
     pub risk: Risk,
     #[serde(default)]
@@ -85,6 +89,8 @@ pub struct CleanerDef {
     /// Shown to the user, e.g. "You will be logged out of websites".
     #[serde(default)]
     pub note: Option<String>,
+    #[serde(default)]
+    pub note_hi: Option<String>,
     #[serde(default = "windows_only")]
     pub os: Vec<String>,
     /// Check every file's type: anything that looks like the user's own file (document,

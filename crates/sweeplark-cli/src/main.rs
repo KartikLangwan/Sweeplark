@@ -1,4 +1,4 @@
-//! `sweeplark` – Sweeplark from the command line (also used for scheduled cleaning).
+//! `sweeplark` – Sweeplark from the command line (also used for scripting and scheduled cleaning).
 
 use std::io::{BufRead, Write};
 
@@ -19,7 +19,7 @@ use sweeplark_core::util::format_bytes;
 use sweeplark_core::{Risk, TrustLevel};
 
 #[derive(Parser)]
-#[command(name = "sweeplark", version, about = "Sweeplark: small bird, clean PC. Saaf PC, tez PC, aur control aapke haath mein.")]
+#[command(name = "sweeplark", version, about = "Sweeplark: small bird, clean PC.")]
 struct Cli {
     /// Output JSON instead of text.
     #[arg(long, global = true)]
@@ -30,9 +30,9 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// PC ki sehat: CPU, RAM, disk, battery, security.
+    /// PC health: CPU, RAM, disks, battery, security.
     Health,
-    /// Bekaar files dhoondo (kuch delete nahi hota).
+    /// Find junk files (nothing is deleted).
     Scan {
         /// Show every risk level (Expert).
         #[arg(long)]
@@ -41,7 +41,7 @@ enum Command {
         #[arg(long)]
         privacy: bool,
     },
-    /// Scan, preview dikhao, phir chuni hui cheezein saaf karo.
+    /// Scan, show the preview, then clean what you choose.
     Clean {
         /// Only these cleaner ids (comma separated). Default: all enabled.
         #[arg(long, value_delimiter = ',')]
@@ -58,21 +58,21 @@ enum Command {
         #[command(subcommand)]
         action: Option<StartupCmd>,
     },
-    /// Har badlav ka hisaab.
+    /// Every change Sweeplark made.
     History {
         #[arg(long, default_value_t = 20)]
         limit: usize,
     },
-    /// Ek badlav wapas lo.
+    /// Undo one change.
     Undo { id: i64 },
-    /// One-Click: scan, plan dikhao, safe cheezein theek karo.
+    /// One-Click: scan, show the plan, fix only the safe part.
     Optimize {
         #[arg(long)]
         yes: bool,
     },
-    /// Sawaal poocho, jaise "PC slow kyun hai?"
+    /// Ask a question, e.g. "Why is my PC slow?"
     Ask { question: Vec<String> },
-    /// Saare cleaner rules ki list.
+    /// List all cleaner rules.
     Rules,
 }
 
@@ -106,7 +106,7 @@ fn confirm(question: &str) -> bool {
     let _ = std::io::stdout().flush();
     let mut line = String::new();
     std::io::stdin().lock().read_line(&mut line).ok();
-    matches!(line.trim().to_lowercase().as_str(), "y" | "yes" | "haan" | "ha" | "h")
+    matches!(line.trim().to_lowercase().as_str(), "y" | "yes" | "haan" | "ha")
 }
 
 fn risk_label(r: Risk) -> &'static str {
@@ -120,9 +120,9 @@ fn risk_label(r: Risk) -> &'static str {
 fn status_label(s: &PreviewStatus) -> String {
     match s {
         PreviewStatus::Ready => String::new(),
-        PreviewStatus::Empty => "kuch nahi mila".into(),
-        PreviewStatus::AppRunning { apps } => format!("pehle band karein: {}", apps.join(", ")),
-        PreviewStatus::NeedsAdmin => "admin chahiye".into(),
+        PreviewStatus::Empty => "nothing found".into(),
+        PreviewStatus::AppRunning { apps } => format!("close first: {}", apps.join(", ")),
+        PreviewStatus::NeedsAdmin => "needs admin".into(),
     }
 }
 
@@ -132,11 +132,11 @@ fn print_scan(report: &cleaner::ScanReport) {
         let size = if c.files > 0 { format_bytes(c.bytes) } else { "-".into() };
         println!("{:<34} {:>7} {:>10}  {}", c.name, risk_label(c.risk), size, status_label(&c.status));
         for b in &c.blocked {
-            println!("    safety ne roka: {b}");
+            println!("    blocked by safety: {b}");
         }
     }
     println!(
-        "\nKul: {} ({} files), {} ms mein",
+        "\nTotal: {} ({} files) in {} ms",
         format_bytes(report.total_bytes),
         report.total_files,
         report.duration_ms
@@ -148,7 +148,7 @@ fn cmd_health(app: &App) -> Result<()> {
     if app.json {
         return app.print_json(&h);
     }
-    println!("{} | {} | uptime {} ghante", h.os, h.host_name, h.uptime_secs / 3600);
+    println!("{} | {} | uptime {} hours", h.os, h.host_name, h.uptime_secs / 3600);
     println!("CPU   {} ({} cores) {:.0}%", h.cpu_brand, h.cpu_cores, h.cpu_percent);
     println!(
         "RAM   {} / {} ({:.0}%)",
@@ -158,7 +158,7 @@ fn cmd_health(app: &App) -> Result<()> {
     );
     for d in &h.disks {
         println!(
-            "Disk  {:<6} {:<4} {} khaali / {} {}",
+            "Disk  {:<6} {:<4} {} free / {} {}",
             d.mount,
             d.kind,
             format_bytes(d.free_bytes),
@@ -166,12 +166,12 @@ fn cmd_health(app: &App) -> Result<()> {
             if d.is_system { "(system)" } else { "" }
         );
     }
-    println!("\nSabse zyada RAM:");
+    println!("\nUsing the most RAM:");
     for a in h.top_memory.iter().take(5) {
         println!("  {:<28} {:>10}  ({} processes)", a.name, format_bytes(a.memory_bytes), a.processes);
     }
     if let Some(b) = &h.battery {
-        println!("\nBattery {:?}% ghisawat {:?}", b.percent, b.wear_percent().map(|w| format!("{w:.0}%")));
+        println!("\nBattery {:?}% wear {:?}", b.percent, b.wear_percent().map(|w| format!("{w:.0}%")));
     }
     if let Some(s) = &h.security {
         println!(
@@ -216,14 +216,14 @@ fn cmd_clean(app: &App, only: Option<Vec<String>>, privacy: bool, yes: bool) -> 
         .collect();
     if ready.is_empty() {
         if !app.json {
-            println!("Saaf karne ko kuch nahi hai.");
+            println!("Nothing to clean.");
         }
         return Ok(());
     }
     let has_risky = report.cleaners.iter().any(|c| ready.contains(&c.id) && c.risk != Risk::Safe);
     let confirmed = if yes {
         if has_risky && !app.json {
-            println!("--yes ke saath sirf 'safe' cleaners chalenge; baaki ke liye bina --yes chalayein.");
+            println!("With --yes only 'safe' cleaners run; run without --yes for the rest.");
         }
         false
     } else {
@@ -232,8 +232,8 @@ fn cmd_clean(app: &App, only: Option<Vec<String>>, privacy: bool, yes: bool) -> 
                 println!("  ! {}: {note}", c.name);
             }
         }
-        if !confirm(&format!("{} saaf karein?", format_bytes(report.total_bytes))) {
-            println!("Kuch nahi badla.");
+        if !confirm(&format!("Clean {}?", format_bytes(report.total_bytes))) {
+            println!("Nothing changed.");
             return Ok(());
         }
         true
@@ -246,32 +246,32 @@ fn cmd_clean(app: &App, only: Option<Vec<String>>, privacy: bool, yes: bool) -> 
     for o in &res.outcomes {
         let mut line = format!("{:<34} {:>10}", o.name, format_bytes(o.freed_bytes));
         if o.in_use > 0 {
-            line.push_str(&format!("  {} files use mein thi (chhod di)", o.in_use));
+            line.push_str(&format!("  {} files in use (skipped)", o.in_use));
         }
         if let Some(r) = &o.skipped_reason {
-            line.push_str(&format!("  chhoda: {r}"));
+            line.push_str(&format!("  skipped: {r}"));
         }
         println!("{line}");
     }
-    println!("\n{} jagah bachi. Hisaab #{:?} mein likha gaya.", format_bytes(res.freed_bytes), res.ledger_id);
+    println!("\nFreed {}. Recorded as change #{:?}.", format_bytes(res.freed_bytes), res.ledger_id);
     Ok(())
 }
 
 fn cmd_startup(app: &App, action: Option<StartupCmd>) -> Result<()> {
     let reg = system_registry();
-    let items = startup::list(reg.as_ref(), &StartupFolders::system(), &KnownApps::builtin())?;
+    let items = startup::list(reg.as_ref(), &StartupFolders::system(), &KnownApps::builtin().with_lang(app.settings.language))?;
     match action.unwrap_or(StartupCmd::List) {
         StartupCmd::List => {
             if app.json {
                 return app.print_json(&items);
             }
             if items.is_empty() {
-                println!("Koi startup app nahi mili.");
+                println!("No startup apps found.");
             }
             for i in &items {
                 let advice = match i.advice {
-                    Advice::Keep => "rakhein",
-                    Advice::Disable => "band kar sakte hain",
+                    Advice::Keep => "keep",
+                    Advice::Disable => "safe to turn off",
                     Advice::Neutral => "",
                 };
                 println!(
@@ -285,7 +285,7 @@ fn cmd_startup(app: &App, action: Option<StartupCmd>) -> Result<()> {
             }
         }
         StartupCmd::Disable { id } | StartupCmd::Enable { id } if !items.iter().any(|i| i.id == id) => {
-            bail!("startup id '{id}' nahi mili; `sweeplark startup list` dekhein")
+            bail!("startup id '{id}' not found; see `sweeplark startup list`")
         }
         cmd @ (StartupCmd::Disable { .. } | StartupCmd::Enable { .. }) => {
             let (id, enable) = match cmd {
@@ -295,11 +295,11 @@ fn cmd_startup(app: &App, action: Option<StartupCmd>) -> Result<()> {
             };
             let item = items.iter().find(|i| i.id == id).expect("checked above");
             let ledger = app.ledger()?;
-            let change = startup::set_enabled_recorded(reg.as_ref(), &ledger, item, enable, is_admin())?;
+            let change = startup::set_enabled_recorded(reg.as_ref(), &ledger, item, enable, is_admin(), app.settings.language)?;
             println!(
-                "{} {}. Wapas lene ke liye: sweeplark undo {change}",
+                "{} {}. To undo: sweeplark undo {change}",
                 item.name,
-                if enable { "chalu ho gaya" } else { "band ho gaya" }
+                if enable { "turned on" } else { "turned off" }
             );
         }
     }
@@ -313,7 +313,7 @@ fn cmd_history(app: &App, limit: usize) -> Result<()> {
         return app.print_json(&rows);
     }
     let s = ledger.summary()?;
-    println!("Kul {} badlav, {} jagah bachi.\n", s.changes, format_bytes(s.bytes_freed));
+    println!("{} changes, {} freed in total.\n", s.changes, format_bytes(s.bytes_freed));
     for r in rows {
         println!(
             "#{:<4} {} {:<9} {}{}",
@@ -321,7 +321,7 @@ fn cmd_history(app: &App, limit: usize) -> Result<()> {
             r.at.format("%Y-%m-%d %H:%M"),
             format!("{:?}", r.status).to_lowercase(),
             r.title,
-            if r.can_undo { "  (undo ho sakta hai)" } else { "" }
+            if r.can_undo { "  (can undo)" } else { "" }
         );
     }
     Ok(())
@@ -333,7 +333,7 @@ fn cmd_undo(app: &App, id: i64) -> Result<()> {
     if app.json {
         return app.print_json(&rec);
     }
-    println!("Wapas le liya: {}", rec.title);
+    println!("Undone: {}", rec.title);
     Ok(())
 }
 
@@ -341,33 +341,33 @@ fn cmd_optimize(app: &App, yes: bool) -> Result<()> {
     let reg = system_registry();
     let plan = optimize::plan(&app.rules, &app.settings, reg.as_ref())?;
     if !app.json {
-        println!("== Scan ho gaya ==");
+        println!("== Scan done ==");
         for f in &plan.findings {
             println!("[{:?}] {}\n    {}", f.severity, f.title, f.detail);
         }
-        println!("\nSafe safai: {} ({} cleaners)", format_bytes(plan.auto_fix_bytes), plan.auto_fix_ids.len());
+        println!("\nSafe cleanup: {} ({} cleaners)", format_bytes(plan.auto_fix_bytes), plan.auto_fix_ids.len());
     }
     if plan.auto_fix_ids.is_empty() {
         if app.json {
             return app.print_json(&plan);
         }
-        println!("Khud se theek karne layak kuch nahi mila.");
+        println!("Nothing to fix automatically.");
         return Ok(());
     }
-    if !yes && !confirm("Safe cheezein abhi theek karein?") {
-        println!("Kuch nahi badla.");
+    if !yes && !confirm("Fix the safe items now?") {
+        println!("Nothing changed.");
         return Ok(());
     }
     let report = optimize::apply(&plan, &app.rules, &app.settings, &app.ledger()?)?;
     if app.json {
         return app.print_json(&report);
     }
-    println!("\n== Report ==\n{} jagah bachi, {} files hatayi.", format_bytes(report.clean.freed_bytes), report.clean.deleted_files);
+    println!("\n== Report ==\nFreed {}, removed {} files.", format_bytes(report.clean.freed_bytes), report.clean.deleted_files);
     if let (Some(b), Some(a)) = (report.system_free_before, report.system_free_after) {
-        println!("System drive khaali: {} -> {}", format_bytes(b), format_bytes(a));
+        println!("System drive free: {} -> {}", format_bytes(b), format_bytes(a));
     }
     if !plan.startup_suggestions.is_empty() {
-        println!("Aapke faisle ke liye: {} startup apps band ki ja sakti hain (`sweeplark startup`).", plan.startup_suggestions.len());
+        println!("For you to decide: {} startup apps can be turned off (`sweeplark startup`).", plan.startup_suggestions.len());
     }
     Ok(())
 }
@@ -376,8 +376,8 @@ fn cmd_ask(app: &App, question: &str) -> Result<()> {
     let h = health::snapshot(true);
     let reg = system_registry();
     let items = startup::list(reg.as_ref(), &StartupFolders::system(), &KnownApps::builtin()).unwrap_or_default();
-    let findings = advisor::analyze(&h, None, Some(&items));
-    let answer = advisor::ask(question, &findings);
+    let findings = advisor::analyze(&h, None, Some(&items), app.settings.language);
+    let answer = advisor::ask(question, &findings, app.settings.language);
     if app.json {
         return app.print_json(&answer);
     }
@@ -409,7 +409,7 @@ fn main() -> Result<()> {
     let settings = Settings::load(&paths.settings_file());
     let app = App { paths, settings, rules: RuleSet::builtin(), json: cli.json };
     if app.settings.trust_level == TrustLevel::Safe && !app.json {
-        eprintln!("(Safe mode: sirf safe cheezein dikhengi)");
+        eprintln!("(Safe mode: only safe items are shown)");
     }
     match cli.command {
         Command::Health => cmd_health(&app),

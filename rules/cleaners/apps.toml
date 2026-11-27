@@ -3,7 +3,8 @@
 [[cleaner]]
 id = "discord.cache"
 name = "Discord cache"
-description = "Images aur media ki cached files. Chats aur login safe rahenge."
+description = "Cached images and media. Chats and login stay safe."
+description_hi = "Images aur media ki cached files. Chats aur login safe rahenge."
 category = "apps"
 risk = "safe"
 running = ["discord.exe"]
@@ -17,7 +18,8 @@ path = "%APPDATA%/discord/GPUCache"
 [[cleaner]]
 id = "teams.classic.cache"
 name = "Microsoft Teams (classic) cache"
-description = "Teams ki cached files. Chats aur login safe rahenge."
+description = "Cached Teams files. Chats and login stay safe."
+description_hi = "Teams ki cached files. Chats aur login safe rahenge."
 category = "apps"
 risk = "safe"
 running = ["teams.exe"]
@@ -31,7 +33,8 @@ path = "%APPDATA%/Microsoft/Teams/GPUCache"
 [[cleaner]]
 id = "slack.cache"
 name = "Slack cache"
-description = "Slack ki cached files. Chats aur login safe rahenge."
+description = "Cached Slack files. Chats and login stay safe."
+description_hi = "Slack ki cached files. Chats aur login safe rahenge."
 category = "apps"
 risk = "safe"
 running = ["slack.exe"]
@@ -45,7 +48,8 @@ path = "%APPDATA%/Slack/GPUCache"
 [[cleaner]]
 id = "java.cache"
 name = "Java cache"
-description = "Java applets aur Web Start ki downloaded files."
+description = "Files downloaded by Java applets and Web Start."
+description_hi = "Java applets aur Web Start ki downloaded files."
 category = "apps"
 risk = "safe"
 [[cleaner.target]]
