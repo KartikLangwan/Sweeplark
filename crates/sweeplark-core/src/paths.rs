@@ -10,13 +10,26 @@ pub struct AppPaths {
 }
 
 impl AppPaths {
-    /// Standard per-user locations. `SWEEPLARK_HOME` overrides both (portable mode, tests).
+    /// Portable mode: the exe is named `*portable*` or has a `portable.txt` next to it.
+    /// Data then lives in `SweeplarkData` beside the exe.
+    pub fn portable_home() -> Option<PathBuf> {
+        let exe = std::env::current_exe().ok()?;
+        let dir = exe.parent()?;
+        let name = exe.file_stem()?.to_string_lossy().to_lowercase();
+        (name.contains("portable") || dir.join("portable.txt").exists()).then(|| dir.join("SweeplarkData"))
+    }
+
+    pub fn is_portable() -> bool {
+        Self::portable_home().is_some()
+    }
+
+    /// Installed: `%LOCALAPPDATA%\Sweeplark` (data, logs, AI models) and `%APPDATA%\Sweeplark`
+    /// (settings). `SWEEPLARK_HOME` overrides both (tests); portable mode keeps all next to the exe.
     pub fn discover() -> Result<Self> {
-        if let Some(home) = std::env::var_os("SWEEPLARK_HOME") {
-            let home = PathBuf::from(home);
+        if let Some(home) = std::env::var_os("SWEEPLARK_HOME").map(PathBuf::from).or_else(Self::portable_home) {
             return Ok(Self { data_dir: home.join("data"), config_dir: home.join("config") });
         }
-        let dirs = directories::ProjectDirs::from("app", "Sweeplark", "Sweeplark")
+        let dirs = directories::ProjectDirs::from("", "", "Sweeplark")
             .ok_or_else(|| Error::Other("could not find the user profile folder".into()))?;
         Ok(Self { data_dir: dirs.data_local_dir().to_path_buf(), config_dir: dirs.config_dir().to_path_buf() })
     }

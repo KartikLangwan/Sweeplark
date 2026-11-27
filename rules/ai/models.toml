@@ -20,7 +20,7 @@ license = "Apache-2.0"
 context = 4096
 # Small models write short summaries next to the app's own findings.
 style = "brief"
-description = "Sabse halka. 4-6 GB RAM wale purane PCs ke liye."
+description = "Lightest. For older PCs with 4–6 GB RAM."
 
 [[model]]
 tier = "balanced"
@@ -33,7 +33,7 @@ sha256 = "aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223"
 license = "Apache-2.0"
 context = 6144
 style = "full"
-description = "Achha balance. 8 GB RAM wale zyadatar PCs ke liye."
+description = "Good balance. For most PCs with 8 GB RAM."
 
 [[model]]
 tier = "power"
@@ -46,4 +46,4 @@ sha256 = "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4"
 license = "Apache-2.0"
 context = 8192
 style = "full"
-description = "Sabse samajhdar. 16 GB RAM ya graphics card wale PCs ke liye."
+description = "Smartest. For PCs with 16 GB RAM or a graphics card."

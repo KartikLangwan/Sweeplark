@@ -3,6 +3,7 @@
 mod ai_engine;
 mod commands;
 mod host;
+mod tray;
 
 use std::sync::Mutex;
 use std::time::Duration;
@@ -14,8 +15,6 @@ use sweeplark_core::ledger::Ledger;
 use sweeplark_core::optimize::OptimizePlan;
 use sweeplark_core::paths::AppPaths;
 use sweeplark_core::settings::Settings;
-use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
-use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Emitter, Manager, WindowEvent};
 
 use crate::ai_engine::AiEngine;
@@ -30,6 +29,7 @@ pub struct AppState {
     pub last_scan: Mutex<Option<ScanReport>>,
     pub last_plan: Mutex<Option<OptimizePlan>>,
     pub ai: AiEngine,
+    pub update: Mutex<Option<sweeplark_core::update::UpdateInfo>>,
 }
 
 impl AppState {
@@ -50,6 +50,7 @@ impl AppState {
             store: Mutex::new(store),
             last_scan: Mutex::new(None),
             last_plan: Mutex::new(None),
+            update: Mutex::new(None),
         })
     }
 }
@@ -67,61 +68,13 @@ pub fn show_main(app: &AppHandle, page: Option<&str>) {
 
 /// Tray icon shows an amber dot while something waits for the user.
 pub fn refresh_tray(app: &AppHandle) {
-    let state = app.state::<AppState>();
-    let attention = state
+    let attention = app
+        .state::<AppState>()
         .store
         .lock()
         .map(|s| !s.pending_approvals().unwrap_or_default().is_empty())
         .unwrap_or(false);
-    if let Some(tray) = app.tray_by_id("main") {
-        let bytes: &[u8] = if attention {
-            include_bytes!("../icons/tray-alert@2x.png")
-        } else {
-            include_bytes!("../icons/tray@2x.png")
-        };
-        if let Ok(img) = tauri::image::Image::from_bytes(bytes) {
-            let _ = tray.set_icon(Some(img));
-        }
-        let hinglish = state.settings.lock().map(|s| s.language == sweeplark_core::Lang::Hinglish).unwrap_or(false);
-        let tip = match (attention, hinglish) {
-            (true, false) => "Sweeplark: waiting for your approval",
-            (true, true) => "Sweeplark: aapki ijazat ka intezaar hai",
-            (false, false) => "Sweeplark: all good",
-            (false, true) => "Sweeplark: sab theek",
-        };
-        let _ = tray.set_tooltip(Some(tip));
-    }
-}
-
-fn build_tray(app: &AppHandle) -> tauri::Result<()> {
-    let open = MenuItem::with_id(app, "open", "Open Sweeplark", true, None::<&str>)?;
-    let clean = MenuItem::with_id(app, "clean", "Clean", true, None::<&str>)?;
-    let inbox = MenuItem::with_id(app, "inbox", "Messages", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-    let sep = PredefinedMenuItem::separator(app)?;
-    let menu = Menu::with_items(app, &[&open, &clean, &inbox, &sep, &quit])?;
-    TrayIconBuilder::with_id("main")
-        .icon(tauri::image::Image::from_bytes(include_bytes!("../icons/tray@2x.png"))?)
-        .tooltip("Sweeplark")
-        .menu(&menu)
-        .show_menu_on_left_click(false)
-        .on_menu_event(|app, event| match event.id().as_ref() {
-            "open" => show_main(app, None),
-            "clean" => show_main(app, Some("clean")),
-            "inbox" => show_main(app, Some("inbox")),
-            "quit" => {
-                app.state::<AppState>().ai.unload();
-                app.exit(0);
-            }
-            _ => {}
-        })
-        .on_tray_icon_event(|tray, event| {
-            if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
-                show_main(tray.app_handle(), None);
-            }
-        })
-        .build(app)?;
-    Ok(())
+    tray::set_attention(app, attention);
 }
 
 /// The background agent: one tick a minute on its own thread.
@@ -162,7 +115,8 @@ pub fn run() {
         .setup(move |app| {
             let state = AppState::new().map_err(Box::<dyn std::error::Error>::from)?;
             app.manage(state);
-            build_tray(app.handle())?;
+            tray::build(app.handle())?;
+            tray::start_stats(app.handle().clone());
             refresh_tray(app.handle());
             commands::apply_autostart(app.handle());
             if !background {
@@ -170,6 +124,7 @@ pub fn run() {
             }
             start_agent(app.handle().clone());
             start_ai_janitor(app.handle().clone());
+            commands::start_update_check(app.handle().clone());
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -204,6 +159,10 @@ pub fn run() {
             commands::efficiency_mode,
             commands::open_windows_security,
             commands::relaunch_as_admin,
+            commands::update_check,
+            commands::update_install,
+            commands::update_skip,
+            commands::open_url,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Sweeplark");

@@ -16,6 +16,18 @@
 
 ---
 
+## Download
+
+Get the latest version from **[Releases](../../releases)**:
+
+| File | For |
+|---|---|
+| `Sweeplark-x.y.z-Setup.exe` | **Recommended.** ~4 MB installer, no admin needed. Starts with Windows in the tray. Data in `%LOCALAPPDATA%\Sweeplark`, settings in `%APPDATA%\Sweeplark`. |
+| `Sweeplark-x.y.z-Portable.exe` | Single exe, no install. Keeps everything in a `SweeplarkData` folder next to it. |
+
+The app checks GitHub for new versions at startup and asks before updating.
+Not code-signed yet: if SmartScreen appears, click **More info → Run anyway**.
+
 ## Why Sweeplark
 
 | | |
@@ -82,6 +94,11 @@ Run the core tests (any OS):
 ```bash
 cargo test
 ```
+
+## Developer
+
+Made by **[Kartik Langwan](https://kartiklangwan.runs-on.dev)** — independent developer, Delhi, India.
+I make websites, tools, apps and Discord bots that feel good to use.
 
 ## License
 

@@ -23,6 +23,7 @@ pub mod risk;
 pub mod safety;
 pub mod settings;
 pub mod startup;
+pub mod update;
 pub mod util;
 
 pub use error::{Error, Result};

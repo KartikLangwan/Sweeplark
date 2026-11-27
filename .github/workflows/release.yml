@@ -1,0 +1,60 @@
+name: Release
+
+# Push a tag like v1.1.0 to build the Windows installer + portable exe and draft a GitHub Release.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Install UI dependencies
+        working-directory: app
+        run: npm ci
+      - name: Build
+        working-directory: app
+        run: npx tauri build
+      - name: Collect files
+        shell: pwsh
+        run: |
+          $v = (Get-Content app/src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          New-Item -ItemType Directory -Force out | Out-Null
+          Copy-Item (Get-ChildItem target/release/bundle/nsis/*.exe | Select-Object -First 1) "out/Sweeplark-$v-Setup.exe"
+          Copy-Item target/release/Sweeplark.exe "out/Sweeplark-$v-Portable.exe"
+          Get-ChildItem out | ForEach-Object { "{0}  {1:N1} MB" -f $_.Name, ($_.Length / 1MB) }
+          Get-FileHash out/*.exe -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } | Out-File out/SHA256SUMS.txt -Encoding ascii
+      # Code signing (removes the SmartScreen warning once a certificate exists):
+      # add Azure Trusted Signing or SignPath here and sign out/*.exe before upload.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sweeplark-windows
+          path: out/*
+      - name: Draft GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          name: Sweeplark ${{ github.ref_name }}
+          files: out/*
+          body: |
+            **Sweeplark** — Small bird. Clean PC.
+
+            | File | For |
+            |---|---|
+            | `Sweeplark-*-Setup.exe` | **Recommended.** Installs for your user (no admin), starts with Windows in the tray, data in `%LOCALAPPDATA%\Sweeplark`. |
+            | `Sweeplark-*-Portable.exe` | Single exe, no install. Keeps its data in a `SweeplarkData` folder next to it. Does not start with Windows. |
+
+            Windows 10/11 (64-bit). The installer is not code-signed yet, so Windows SmartScreen may show "Windows protected your PC": click **More info → Run anyway**. Checksums are in `SHA256SUMS.txt`.

@@ -95,6 +95,7 @@ let settings: Settings = {
     notify: { enabled: true, sound: true, max_per_day: 4, quiet_from: "22:30", quiet_to: "08:00" },
   },
   ai: { enabled: true, tier: "balanced", use_gpu: true, unload_after_secs: 120, review_files: true, write_summaries: true },
+  check_updates: true, skipped_version: null,
 };
 
 const approvals: Approval[] = [{
@@ -145,7 +146,7 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export async function mock<T>(cmd: string, args: Record<string, unknown> = {}): Promise<T> {
   await wait(cmd === "scan" || cmd === "optimize_plan" ? 900 : 120);
   const table: Record<string, unknown> = {
-    app_info: { name: "Sweeplark", tagline: "Small bird. Clean PC.", tagline_hi: "Saaf PC, tez PC, aur control aapke haath mein.", version: "1.1.0", is_admin: false, os: "windows" } satisfies AppInfo,
+    app_info: { name: "Sweeplark", tagline: "Small bird. Clean PC.", tagline_hi: "Saaf PC, tez PC, aur control aapke haath mein.", version: "1.1.0", is_admin: false, os: "windows", developer: "Kartik Langwan", developer_title: "Independent developer · Delhi, India", developer_tagline: "I make websites, tools, apps and Discord bots that feel good to use.", developer_url: "https://kartiklangwan.runs-on.dev", repo: "KartikLangwan/sweeplark", portable: false } satisfies AppInfo,
     get_health: health,
     scan,
     clean: { freed_bytes: 2.36 * GB, deleted_files: 16541, ledger_id: 7,
@@ -162,6 +163,7 @@ export async function mock<T>(cmd: string, args: Record<string, unknown> = {}): 
     approval_decide: { freed_bytes: 1.6 * GB, deleted_files: 8348, ledger_id: 8, outcomes: [] },
     ai_status: aiStatus,
     efficiency_mode: 7,
+    update_check: { version: "1.2.0", notes: "• Faster scans\n• New cleaners for WhatsApp Desktop and Zoom\n• Smaller installer", published_at: iso(60 * 5), page_url: "https://github.com/KartikLangwan/sweeplark/releases", setup_url: "x", setup_size: 4.1 * MB, setup_sha256: "x" },
   };
   if (cmd === "settings_set") settings = args.settings as Settings;
   if (cmd === "startup_set") {

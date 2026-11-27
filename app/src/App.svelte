@@ -12,6 +12,7 @@
   import Inbox from "./pages/Inbox.svelte";
   import History from "./pages/History.svelte";
   import SettingsPage from "./pages/Settings.svelte";
+  import UpdateModal from "./components/UpdateModal.svelte";
 
   const nav = $derived<{ id: Page; label: string; icon: string }[]>([
     { id: "home", label: t("Home", "Home"), icon: "home" },
@@ -88,6 +89,8 @@
       </div>
     {/key}
   </main>
+
+  <UpdateModal />
 
   <div class="toasts" aria-live="polite">
     {#each ui.toasts as t (t.id)}

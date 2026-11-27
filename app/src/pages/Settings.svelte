@@ -55,6 +55,15 @@
     s.ai.tier = tier; s.ai.enabled = true; save(); loadAi();
   }
   const downloading = $derived(progress && (progress.stage === "runtime" || progress.stage === "model"));
+  let checking = $state(false);
+  async function checkNow() {
+    checking = true;
+    try {
+      const u = await api.updateCheck(true);
+      toast(u ? t(`Version ${u.version} is available`, `Version ${u.version} aaya hai`) : t("You have the latest version", "Aapke paas latest version hai"), u ? "info" : "good");
+      if (u) location.reload();
+    } catch (e) { toast(String(e), "warn"); } finally { checking = false; }
+  }
   const TIER_LABEL: Record<Tier, string> = { lite: "Lite", balanced: "Balanced", power: "High" };
 </script>
 
@@ -165,6 +174,28 @@
     {/if}
   </section>
 
+  <section class="card about-card">
+    <div class="card-title"><Icon name="bird" /><h2>{t("About", "About")}</h2></div>
+    <div class="row app-row">
+      <div class="col" style="gap:2px"><strong>Sweeplark {ui.info?.version}{ui.info?.portable ? " · Portable" : ""}</strong>
+        <span class="muted small">{ui.info?.tagline}</span></div>
+      <span class="spacer"></span>
+      <div class="row"><span class="muted small">{t("Check at startup", "Startup par check")}</span><Toggle bind:checked={s.check_updates} onchange={save} label="Updates" />
+        <button class="btn small" onclick={checkNow} disabled={checking}><Icon name="download" size={15} />{checking ? t("Checking…", "Check ho raha…") : t("Check for updates", "Update check karo")}</button></div>
+    </div>
+    <div class="dev">
+      <div class="avatar">KL</div>
+      <div class="col" style="gap:3px">
+        <span class="muted small">{t("Made by", "Banaya")}</span>
+        <strong class="dname">{ui.info?.developer ?? "Kartik Langwan"}</strong>
+        <span class="muted small">{ui.info?.developer_title}</span>
+        <p class="small">{ui.info?.developer_tagline}</p>
+      </div>
+      <span class="spacer"></span>
+      <button class="btn primary small" onclick={() => api.openUrl(ui.info?.developer_url ?? "https://kartiklangwan.runs-on.dev")}>{t("Visit portfolio", "Portfolio dekhein")}<Icon name="chevron" size={14} /></button>
+    </div>
+  </section>
+
   <p class="muted small about">{ui.info?.name ?? "Sweeplark"} {ui.info?.version} · {ui.info?.tagline} · {t("No ads, no account, no tracking.", "Na ads, na account, na tracking.")}</p>
 {/if}
 
@@ -185,4 +216,8 @@
   .warn { color: var(--amber-text); }
   .model .btn { align-self: flex-start; margin-top: auto; }
   .about { text-align: center; margin-top: 8px; }
+  .app-row { padding: 6px 0 14px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .dev { display: flex; align-items: center; gap: 16px; padding-top: 16px; flex-wrap: wrap; }
+  .avatar { width: 54px; height: 54px; border-radius: 16px; display: grid; place-items: center; font-weight: 700; font-size: 18px; color: #fff; background: linear-gradient(135deg, var(--mint), var(--teal)); flex: none; }
+  .dname { font-size: 18px; }
 </style>

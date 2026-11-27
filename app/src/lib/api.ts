@@ -3,7 +3,7 @@
 
 import type {
   AiStatus, AppInfo, Approval, AssistantReply, ChatEvent, ChatTurn, CleanReport, ChangeRecord, Health, History,
-  Inbox, OptimizePlan, OptimizeReport, ScanReport, Settings, StartupItem, Tier, InstallProgress,
+  Inbox, OptimizePlan, UpdateInfo, OptimizeReport, ScanReport, Settings, StartupItem, Tier, InstallProgress,
 } from "./types";
 
 export const inTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -49,6 +49,10 @@ export const api = {
   efficiency: (name: string, on: boolean) => call<number>("efficiency_mode", { name, on }),
   openSecurity: () => call<void>("open_windows_security"),
   relaunchAdmin: () => call<void>("relaunch_as_admin"),
+  updateCheck: (manual = false) => call<UpdateInfo | null>("update_check", { manual }),
+  updateInstall: () => call<void>("update_install"),
+  updateSkip: (version: string) => call<void>("update_skip", { version }),
+  openUrl: (url: string) => (inTauri ? call<void>("open_url", { url }) : Promise.resolve(void window.open(url, "_blank"))),
 
   async chat(question: string, history: ChatTurn[], onEvent: (e: ChatEvent) => void): Promise<AssistantReply> {
     if (inTauri) {

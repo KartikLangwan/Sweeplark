@@ -44,6 +44,12 @@ fn settings_of(app: &AppHandle) -> Settings {
 
 #[derive(Serialize)]
 pub struct AppInfo {
+    developer: &'static str,
+    developer_title: &'static str,
+    developer_tagline: &'static str,
+    developer_url: &'static str,
+    repo: &'static str,
+    portable: bool,
     name: &'static str,
     tagline: &'static str,
     tagline_hi: &'static str,
@@ -55,6 +61,12 @@ pub struct AppInfo {
 #[tauri::command]
 pub fn app_info() -> AppInfo {
     AppInfo {
+        developer: branding::DEVELOPER_NAME,
+        developer_title: branding::DEVELOPER_TITLE,
+        developer_tagline: branding::DEVELOPER_TAGLINE,
+        developer_url: branding::DEVELOPER_URL,
+        repo: branding::UPDATE_REPO,
+        portable: sweeplark_core::paths::AppPaths::is_portable(),
         name: branding::APP_NAME,
         tagline: branding::TAGLINE,
         tagline_hi: branding::TAGLINE_HI,
@@ -511,5 +523,107 @@ pub fn relaunch_as_admin(app: AppHandle) -> CmdResult<()> {
     }
     #[cfg(not(windows))]
     let _ = app;
+    Ok(())
+}
+
+// ---- updates ----
+
+use sweeplark_core::update::{self, UpdateInfo};
+use tauri_plugin_notification::NotificationExt;
+
+/// Check once shortly after start (and every 12 h while running).
+pub fn start_update_check(app: AppHandle) {
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_secs(15));
+        loop {
+            let s = settings_of(&app);
+            if s.check_updates
+                && let Ok(Some(info)) = update::check(env!("CARGO_PKG_VERSION"))
+                && s.skipped_version.as_deref() != Some(info.version.as_str())
+            {
+                let first = app.state::<AppState>().update.lock().map(|g| g.is_none()).unwrap_or(false);
+                if let Ok(mut g) = app.state::<AppState>().update.lock() {
+                    *g = Some(info.clone());
+                }
+                if first {
+                    let (title, body) = match s.language {
+                        sweeplark_core::Lang::En => (format!("Sweeplark {} is available", info.version), "Open Sweeplark to update.".to_string()),
+                        sweeplark_core::Lang::Hinglish => (format!("Sweeplark {} aa gaya hai", info.version), "Update karne ke liye Sweeplark kholein.".to_string()),
+                    };
+                    let _ = app.notification().builder().title(title).body(body).show();
+                    let _ = app.emit("update-available", info);
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_secs(12 * 3600));
+        }
+    });
+}
+
+/// `manual = true` ignores a skipped version (the "Check for updates" button).
+#[tauri::command]
+pub async fn update_check(app: AppHandle, manual: bool) -> CmdResult<Option<UpdateInfo>> {
+    blocking(move || {
+        if !manual
+            && let Some(u) = app.state::<AppState>().update.lock().map_err(err)?.clone()
+        {
+            return Ok(Some(u));
+        }
+        let info = update::check(env!("CARGO_PKG_VERSION")).map_err(err)?;
+        let s = settings_of(&app);
+        let info = info.filter(|i| manual || s.skipped_version.as_deref() != Some(i.version.as_str()));
+        *app.state::<AppState>().update.lock().map_err(err)? = info.clone();
+        Ok(info)
+    })
+    .await
+}
+
+#[tauri::command]
+pub fn update_skip(app: AppHandle, version: String) -> CmdResult<()> {
+    let state = app.state::<AppState>();
+    let mut s = state.settings.lock().map_err(err)?;
+    s.skipped_version = Some(version);
+    s.save(&state.paths.settings_file()).map_err(err)?;
+    *state.update.lock().map_err(err)? = None;
+    Ok(())
+}
+
+/// Download the new installer (hash-checked), start it and close Sweeplark.
+/// Portable copies just open the release page.
+#[tauri::command]
+pub async fn update_install(app: AppHandle) -> CmdResult<()> {
+    let info = app.state::<AppState>().update.lock().map_err(err)?.clone().ok_or("No update")?;
+    if sweeplark_core::paths::AppPaths::is_portable() || info.setup_url.is_none() {
+        #[cfg(windows)]
+        std::process::Command::new("explorer").arg(&info.page_url).spawn().map_err(err)?;
+        return Ok(());
+    }
+    let dir = app.state::<AppState>().paths.data_dir.join("updates");
+    let app2 = app.clone();
+    let path = blocking(move || {
+        let mut last = 0u64;
+        update::download_setup(&info, &dir, &mut |done, total| {
+            if done - last > 256 * 1024 || done == total {
+                last = done;
+                let _ = app2.emit("update-progress", (done, total));
+            }
+            true
+        })
+        .map_err(err)
+    })
+    .await?;
+    std::process::Command::new(path).arg("/P").spawn().map_err(err)?;
+    app.state::<AppState>().ai.unload();
+    app.exit(0);
+    Ok(())
+}
+
+/// Open an https link in the default browser (About section, release page).
+#[tauri::command]
+pub fn open_url(url: String) -> CmdResult<()> {
+    if !url.starts_with("https://") {
+        return Err("Only https links can be opened".into());
+    }
+    #[cfg(windows)]
+    std::process::Command::new("explorer").arg(&url).spawn().map_err(err)?;
     Ok(())
 }

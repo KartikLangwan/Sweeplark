@@ -115,5 +115,13 @@ export interface Settings {
     enabled: boolean; tier: Tier | null; use_gpu: boolean; unload_after_secs: number;
     review_files: boolean; write_summaries: boolean;
   };
+  check_updates: boolean;
+  skipped_version: string | null;
 }
-export interface AppInfo { name: string; tagline: string; tagline_hi: string; version: string; is_admin: boolean; os: string }
+export interface AppInfo {
+  name: string; tagline: string; tagline_hi: string; version: string; is_admin: boolean; os: string;
+  developer: string; developer_title: string; developer_tagline: string; developer_url: string; repo: string; portable: boolean;
+}
+export interface UpdateInfo {
+  version: string; notes: string; published_at: string; page_url: string; setup_url: string | null; setup_size: number; setup_sha256: string | null;
+}

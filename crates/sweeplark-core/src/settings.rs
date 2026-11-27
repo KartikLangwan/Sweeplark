@@ -22,6 +22,10 @@ pub struct Settings {
     pub language: Lang,
     pub agent: AgentSettings,
     pub ai: AiSettings,
+    /// Check GitHub for a new version at startup.
+    pub check_updates: bool,
+    /// A version the user chose to skip.
+    pub skipped_version: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -150,6 +154,8 @@ impl Default for Settings {
             language: Lang::En,
             agent: AgentSettings::default(),
             ai: AiSettings::default(),
+            check_updates: true,
+            skipped_version: None,
         }
     }
 }
@@ -157,7 +163,14 @@ impl Default for Settings {
 impl Settings {
     /// Load settings; a missing or broken file gives defaults (never blocks the app).
     pub fn load(path: &Path) -> Self {
-        std::fs::read_to_string(path).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
+        std::fs::read_to_string(path).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_else(|| {
+            let mut s = Settings::default();
+            // A portable copy should not register itself to start with Windows.
+            if crate::paths::AppPaths::is_portable() {
+                s.agent.start_with_windows = false;
+            }
+            s
+        })
     }
 
     pub fn save(&self, path: &Path) -> Result<()> {
