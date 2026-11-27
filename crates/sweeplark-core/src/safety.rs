@@ -142,6 +142,10 @@ impl SafetyGuard {
 mod tests {
     use super::*;
 
+    fn base() -> PathBuf {
+        PathBuf::from(if cfg!(windows) { "C:\\r" } else { "/r" })
+    }
+
     fn guard(root: &Path) -> SafetyGuard {
         SafetyGuard::new(
             vec![root.join("home/docs"), root.join("home/Pictures")],
@@ -152,7 +156,8 @@ mod tests {
 
     #[test]
     fn allows_cache_folders() {
-        let root = Path::new("/r");
+        let root_buf = base();
+        let root = root_buf.as_path();
         let g = guard(root);
         assert!(g.check_base(&root.join("home/appdata/Temp")).is_ok());
         assert!(g.check_base(&root.join("win/Temp")).is_ok());
@@ -160,19 +165,21 @@ mod tests {
 
     #[test]
     fn blocks_critical_and_parents() {
-        let root = Path::new("/r");
+        let root_buf = base();
+        let root = root_buf.as_path();
         let g = guard(root);
         assert!(g.check_base(&root.join("home")).is_err());
         assert!(g.check_base(&root.join("home/appdata")).is_err());
         assert!(g.check_base(&root.join("home/appdata/")).is_err());
-        assert!(g.check_base(Path::new("/r")).is_err());
+        assert!(g.check_base(root).is_err());
         assert!(g.check_base(Path::new("relative/path")).is_err());
         assert!(g.check_base(&root.join("home/appdata/Temp/../..")).is_err());
     }
 
     #[test]
     fn blocks_personal_trees() {
-        let root = Path::new("/r");
+        let root_buf = base();
+        let root = root_buf.as_path();
         let g = guard(root);
         assert!(g.check_base(&root.join("home/docs/cache")).is_err());
         assert!(g.check_file(&root.join("home/appdata/Temp"), &root.join("home/docs/a.txt")).is_err());
@@ -180,7 +187,8 @@ mod tests {
 
     #[test]
     fn whitelist_and_outside_files() {
-        let root = Path::new("/r");
+        let root_buf = base();
+        let root = root_buf.as_path();
         let g = guard(root);
         let base = root.join("home/appdata");
         assert!(g.check_file(&base, &root.join("home/appdata/keep/x")).is_err());
@@ -190,7 +198,8 @@ mod tests {
 
     #[test]
     fn prefix_is_component_based() {
-        let root = Path::new("/r");
+        let root_buf = base();
+        let root = root_buf.as_path();
         let g = guard(root);
         // "/r/home/docs-cache" is not inside "/r/home/docs".
         assert!(!g.is_personal(&root.join("home/docs-cache/x")));
