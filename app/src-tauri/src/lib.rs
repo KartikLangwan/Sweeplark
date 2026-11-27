@@ -3,6 +3,7 @@
 mod ai_engine;
 mod commands;
 mod host;
+mod pc;
 mod tray;
 
 use std::sync::Mutex;
@@ -30,6 +31,8 @@ pub struct AppState {
     pub last_plan: Mutex<Option<OptimizePlan>>,
     pub ai: AiEngine,
     pub update: Mutex<Option<sweeplark_core::update::UpdateInfo>>,
+    pub tweaks: sweeplark_core::tweaks::TweakSet,
+    pub monitor: Mutex<sweeplark_core::monitor::Monitor>,
 }
 
 impl AppState {
@@ -51,6 +54,8 @@ impl AppState {
             last_scan: Mutex::new(None),
             last_plan: Mutex::new(None),
             update: Mutex::new(None),
+            tweaks: sweeplark_core::tweaks::TweakSet::builtin(),
+            monitor: Mutex::new(sweeplark_core::monitor::Monitor::new()),
         })
     }
 }
@@ -163,6 +168,21 @@ pub fn run() {
             commands::update_install,
             commands::update_skip,
             commands::open_url,
+            pc::tweaks_list,
+            pc::tweak_set,
+            pc::tweaks_apply_recommended,
+            pc::live_stats,
+            pc::process_list,
+            pc::process_end,
+            pc::storage_analyze,
+            pc::storage_recycle,
+            pc::reveal_path,
+            pc::tool_run,
+            pc::shutdown_schedule,
+            pc::windows_tool,
+            pc::hardware_info,
+            pc::power_plans,
+            pc::power_plan_set,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Sweeplark");

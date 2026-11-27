@@ -14,6 +14,7 @@ pub mod cleaner;
 pub mod error;
 pub mod health;
 pub mod lang;
+pub mod monitor;
 pub mod ledger;
 pub mod optimize;
 pub mod paths;
@@ -23,6 +24,9 @@ pub mod risk;
 pub mod safety;
 pub mod settings;
 pub mod startup;
+pub mod storage;
+pub mod tools;
+pub mod tweaks;
 pub mod update;
 pub mod util;
 

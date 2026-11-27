@@ -52,6 +52,7 @@ jobs:
           target_commitish: ${{ github.sha }}
           draft: false
           make_latest: true
+          overwrite_files: true
           name: Sweeplark v${{ env.VERSION }}
           files: out/*
           body: |

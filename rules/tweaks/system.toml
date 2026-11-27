@@ -1,0 +1,155 @@
+# Optimizer: system behaviour.
+
+[[tweak]]
+id = "system.long_paths"
+name = "Allow long file paths"
+description = "Apps can use paths longer than 260 characters (deep project folders)."
+category = "system"
+risk = "safe"
+setting = true
+[[tweak.registry]]
+key = 'HKLM\SYSTEM\CurrentControlSet\Control\FileSystem'
+name = "LongPathsEnabled"
+value = 1
+off = 0
+
+[[tweak]]
+id = "system.verbose_status"
+name = "Detailed startup/shutdown messages"
+description = "Shows what Windows is doing instead of just 'Please wait'."
+category = "system"
+risk = "safe"
+setting = true
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
+name = "VerboseStatus"
+value = 1
+off = 0
+
+[[tweak]]
+id = "system.bsod_details"
+name = "Show details on blue screens"
+description = "Blue screens show the error parameters, which helps find the cause."
+category = "system"
+risk = "safe"
+setting = true
+[[tweak.registry]]
+key = 'HKLM\SYSTEM\CurrentControlSet\Control\CrashControl'
+name = "DisplayParameters"
+value = 1
+off = 0
+
+[[tweak]]
+id = "system.first_logon_animation"
+name = "Skip the 'Hi' animation for new users"
+description = "New accounts sign in without the long welcome animation."
+category = "system"
+risk = "safe"
+setting = true
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System'
+name = "EnableFirstLogonAnimation"
+value = 0
+off = 1
+
+[[tweak]]
+id = "system.numlock"
+name = "Num Lock on at sign-in"
+description = "Num Lock is on when you sign in."
+category = "system"
+risk = "safe"
+setting = true
+[[tweak.registry]]
+key = 'HKCU\Control Panel\Keyboard'
+name = "InitialKeyboardIndicators"
+value = "2"
+off = "0"
+
+[[tweak]]
+id = "system.developer_mode"
+name = "Developer mode"
+description = "Install apps from any source and use developer features."
+category = "system"
+risk = "ask"
+setting = true
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock'
+name = "AllowDevelopmentWithoutDevLicense"
+value = 1
+off = 0
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock'
+name = "AllowAllTrustedApps"
+value = 1
+off = 0
+
+[[tweak]]
+id = "system.utc_clock"
+name = "Hardware clock in UTC"
+description = "Fixes the wrong time when dual-booting with Linux."
+category = "system"
+risk = "expert"
+setting = true
+restart = "reboot"
+[[tweak.registry]]
+key = 'HKLM\SYSTEM\CurrentControlSet\Control\TimeZoneInformation'
+name = "RealTimeIsUniversal"
+value = 1
+off = 0
+
+[[tweak]]
+id = "system.smart_name_resolution"
+name = "Turn off smart multi-homed DNS"
+description = "DNS queries go only to your chosen DNS server, not every adapter at once."
+category = "system"
+risk = "ask"
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows NT\DNSClient'
+name = "DisableSmartNameResolution"
+value = 1
+
+[[tweak]]
+id = "system.update_no_auto_reboot"
+name = "No forced restarts for updates"
+description = "Windows won't restart by itself while you are signed in."
+category = "system"
+risk = "safe"
+recommended = true
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU'
+name = "NoAutoRebootWithLoggedOnUsers"
+value = 1
+
+[[tweak]]
+id = "system.update_no_drivers"
+name = "Don't install drivers through Windows Update"
+description = "Keeps the GPU and other drivers you installed yourself."
+category = "system"
+risk = "ask"
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate'
+name = "ExcludeWUDriversInQualityUpdate"
+value = 1
+
+[[tweak]]
+id = "system.update_max_pause"
+name = "Allow pausing updates for longer"
+description = "Lets you pause Windows Update for much longer in Settings."
+category = "system"
+risk = "ask"
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Microsoft\WindowsUpdate\UX\Settings'
+name = "FlightSettingsMaxPauseDays"
+value = 3640
+
+[[tweak]]
+id = "system.bitlocker_auto_off"
+name = "Prevent automatic device encryption"
+description = "Windows won't silently turn on BitLocker device encryption."
+category = "system"
+risk = "expert"
+note = "Already-encrypted drives stay encrypted. Encryption protects a stolen laptop."
+[[tweak.registry]]
+key = 'HKLM\SYSTEM\CurrentControlSet\Control\BitLocker'
+name = "PreventDeviceEncryption"
+value = 1

@@ -1,0 +1,345 @@
+# Optimizer: Explorer, taskbar and desktop settings. These are two-way switches.
+
+[[tweak]]
+id = "explorer.file_extensions"
+name = "Show file extensions"
+description = "See '.exe', '.pdf' and other extensions. Helps spot fake files."
+category = "explorer"
+risk = "safe"
+recommended = true
+setting = true
+restart = "explorer"
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+name = "HideFileExt"
+value = 0
+off = 1
+
+[[tweak]]
+id = "explorer.hidden_files"
+name = "Show hidden files"
+description = "Shows files and folders marked as hidden."
+category = "explorer"
+risk = "safe"
+setting = true
+restart = "explorer"
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+name = "Hidden"
+value = 1
+off = 2
+
+[[tweak]]
+id = "explorer.launch_this_pc"
+name = "Open Explorer to 'This PC'"
+description = "File Explorer opens on your drives instead of Home/Quick access."
+category = "explorer"
+risk = "safe"
+setting = true
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+name = "LaunchTo"
+value = 1
+off = 2
+
+[[tweak]]
+id = "explorer.compact"
+name = "Compact view"
+description = "Less spacing between items in Explorer."
+category = "explorer"
+risk = "safe"
+setting = true
+restart = "explorer"
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+name = "UseCompactMode"
+value = 1
+off = 0
+
+[[tweak]]
+id = "explorer.checkboxes"
+name = "Item check boxes"
+description = "Check boxes for selecting several files."
+category = "explorer"
+risk = "safe"
+setting = true
+restart = "explorer"
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+name = "AutoCheckSelect"
+value = 1
+off = 0
+
+[[tweak]]
+id = "explorer.sync_ads"
+name = "Hide OneDrive/Office ads in Explorer"
+description = "No sync-provider notifications inside File Explorer."
+category = "explorer"
+risk = "safe"
+recommended = true
+setting = true
+restart = "explorer"
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+name = "ShowSyncProviderNotifications"
+value = 0
+off = 1
+
+[[tweak]]
+id = "explorer.recent_files"
+name = "Hide recent files in Quick access"
+description = "Explorer's Home stops listing files you opened recently."
+category = "explorer"
+risk = "safe"
+setting = true
+restart = "explorer"
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer'
+name = "ShowRecent"
+value = 0
+off = 1
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer'
+name = "ShowFrequent"
+value = 0
+off = 1
+
+[[tweak]]
+id = "explorer.dark_mode"
+name = "Dark mode"
+description = "Dark theme for Windows and apps."
+category = "explorer"
+risk = "safe"
+setting = true
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'
+name = "AppsUseLightTheme"
+value = 0
+off = 1
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'
+name = "SystemUsesLightTheme"
+value = 0
+off = 1
+
+[[tweak]]
+id = "explorer.transparency_off"
+name = "Turn off transparency"
+description = "Solid taskbar and windows. A little lighter on the GPU."
+category = "explorer"
+risk = "safe"
+setting = true
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'
+name = "EnableTransparency"
+value = 0
+off = 1
+
+[[tweak]]
+id = "explorer.shake_off"
+name = "Turn off shake to minimize"
+description = "Shaking a window no longer minimizes all the others."
+category = "explorer"
+risk = "safe"
+setting = true
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+name = "DisallowShaking"
+value = 1
+off = 0
+
+[[tweak]]
+id = "explorer.snap_flyout_off"
+name = "Turn off Snap layouts pop-up"
+description = "No layout pop-up when hovering the maximize button."
+category = "explorer"
+risk = "safe"
+setting = true
+conditions = ["win11"]
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+name = "EnableSnapAssistFlyout"
+value = 0
+off = 1
+
+[[tweak]]
+id = "explorer.clipboard_history"
+name = "Clipboard history"
+description = "Press Win+V to paste anything you copied recently."
+category = "explorer"
+risk = "safe"
+setting = true
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Clipboard'
+name = "EnableClipboardHistory"
+value = 1
+off = 0
+
+[[tweak]]
+id = "explorer.desktop_this_pc"
+name = "Show 'This PC' on the desktop"
+description = "Adds the This PC icon to the desktop."
+category = "explorer"
+risk = "safe"
+setting = true
+restart = "explorer"
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel'
+name = "{20D04FE0-3AEA-1069-A2D8-08002B30309D}"
+value = 0
+off = 1
+
+[[tweak]]
+id = "explorer.desktop_user_files"
+name = "Show your user folder on the desktop"
+description = "Adds your personal folder icon to the desktop."
+category = "explorer"
+risk = "safe"
+setting = true
+restart = "explorer"
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel'
+name = "{59031a47-3f72-44a7-89c5-5595fe6b30ee}"
+value = 0
+off = 1
+
+[[tweak]]
+id = "explorer.desktop_control_panel"
+name = "Show Control Panel on the desktop"
+description = "Adds the Control Panel icon to the desktop."
+category = "explorer"
+risk = "safe"
+setting = true
+restart = "explorer"
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel'
+name = "{5399E694-6CE5-4D6C-8FCE-1D8870FDCBA0}"
+value = 0
+off = 1
+
+[[tweak]]
+id = "explorer.desktop_network"
+name = "Show Network on the desktop"
+description = "Adds the Network icon to the desktop."
+category = "explorer"
+risk = "safe"
+setting = true
+restart = "explorer"
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\HideDesktopIcons\NewStartPanel'
+name = "{F02C1A0D-BE21-4350-88B0-7367FC96EF3C}"
+value = 0
+off = 1
+
+[[tweak]]
+id = "taskbar.align_left"
+name = "Taskbar icons on the left"
+description = "Start button and apps on the left, like Windows 10."
+category = "taskbar"
+risk = "safe"
+setting = true
+conditions = ["win11"]
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+name = "TaskbarAl"
+value = 0
+off = 1
+
+[[tweak]]
+id = "taskbar.task_view_off"
+name = "Hide the Task View button"
+description = "Removes the Task View button from the taskbar."
+category = "taskbar"
+risk = "safe"
+setting = true
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+name = "ShowTaskViewButton"
+value = 0
+off = 1
+
+[[tweak]]
+id = "taskbar.search_icon"
+name = "Search as an icon"
+description = "Shows a small search icon instead of the wide search box."
+category = "taskbar"
+risk = "safe"
+setting = true
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Search'
+name = "SearchboxTaskbarMode"
+value = 1
+off = 2
+
+[[tweak]]
+id = "taskbar.end_task"
+name = "'End task' in taskbar right-click"
+description = "Close frozen apps straight from the taskbar."
+category = "taskbar"
+risk = "safe"
+recommended = true
+setting = true
+conditions = ["win11"]
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced\TaskbarDeveloperSettings'
+name = "TaskbarEndTask"
+value = 1
+off = 0
+
+[[tweak]]
+id = "taskbar.seconds"
+name = "Show seconds in the clock"
+description = "The taskbar clock shows seconds."
+category = "taskbar"
+risk = "safe"
+setting = true
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+name = "ShowSecondsInSystemClock"
+value = 1
+off = 0
+
+[[tweak]]
+id = "taskbar.never_combine"
+name = "Never combine taskbar buttons"
+description = "Each window gets its own labelled taskbar button."
+category = "taskbar"
+risk = "safe"
+setting = true
+restart = "explorer"
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+name = "TaskbarGlomLevel"
+value = 2
+off = 0
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+name = "MMTaskbarGlomLevel"
+value = 2
+off = 0
+
+[[tweak]]
+id = "taskbar.last_active_click"
+name = "Click opens the last active window"
+description = "Clicking a grouped app jumps to the window you used last."
+category = "taskbar"
+risk = "safe"
+setting = true
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+name = "LastActiveClick"
+value = 1
+off = 0
+
+[[tweak]]
+id = "taskbar.animations_off"
+name = "Turn off taskbar animations"
+description = "Taskbar buttons appear instantly."
+category = "taskbar"
+risk = "safe"
+setting = true
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+name = "TaskbarAnimations"
+value = 0
+off = 1

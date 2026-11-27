@@ -1,0 +1,196 @@
+# Optimizer: services. Start types change after a restart. Services that are not installed are skipped.
+
+[[tweak]]
+id = "services.legacy"
+name = "Turn off unused legacy services"
+description = "Fax, Remote Registry, retail demo, AllJoyn, App-V, UE-V and other services home PCs never use."
+category = "services"
+risk = "ask"
+recommended = true
+restart = "reboot"
+[[tweak.service]]
+name = "Fax"
+start = "disabled"
+[[tweak.service]]
+name = "RemoteRegistry"
+start = "disabled"
+[[tweak.service]]
+name = "RetailDemo"
+start = "disabled"
+[[tweak.service]]
+name = "AJRouter"
+start = "disabled"
+[[tweak.service]]
+name = "shpamsvc"
+start = "disabled"
+[[tweak.service]]
+name = "AppVClient"
+start = "disabled"
+[[tweak.service]]
+name = "AssignedAccessManagerSvc"
+start = "disabled"
+[[tweak.service]]
+name = "DialogBlockingService"
+start = "disabled"
+[[tweak.service]]
+name = "UevAgentService"
+start = "disabled"
+[[tweak.service]]
+name = "NetTcpPortSharing"
+start = "disabled"
+[[tweak.service]]
+name = "RemoteAccess"
+start = "disabled"
+[[tweak.service]]
+name = "MapsBroker"
+start = "manual"
+
+[[tweak]]
+id = "services.edge_background"
+name = "Stop Edge running in the background"
+description = "Edge no longer preloads at sign-in or keeps running after you close it."
+category = "services"
+risk = "safe"
+recommended = true
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Edge'
+name = "StartupBoostEnabled"
+value = 0
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Edge'
+name = "BackgroundModeEnabled"
+value = 0
+[[tweak.service]]
+name = "edgeupdate"
+start = "manual"
+[[tweak.service]]
+name = "edgeupdatem"
+start = "manual"
+
+[[tweak]]
+id = "services.search_indexing"
+name = "Turn off search indexing"
+description = "Stops the Windows Search indexer reading your disk. Saves CPU and disk on slow PCs."
+category = "services"
+risk = "ask"
+note = "Searching files in Start and Explorer becomes slower."
+restart = "reboot"
+[[tweak.service]]
+name = "WSearch"
+start = "disabled"
+
+[[tweak]]
+id = "services.sysmain"
+name = "Turn off SysMain (Superfetch)"
+description = "Stops preloading apps into RAM. Can help PCs with little RAM or constant disk use."
+category = "services"
+risk = "ask"
+restart = "reboot"
+note = "Apps you use often may open a little slower on hard disks."
+[[tweak.service]]
+name = "SysMain"
+start = "disabled"
+
+[[tweak]]
+id = "services.printing"
+name = "Turn off printing services"
+description = "For PCs that never print. Turn back on before connecting a printer."
+category = "services"
+risk = "ask"
+restart = "reboot"
+[[tweak.service]]
+name = "Spooler"
+start = "disabled"
+[[tweak.service]]
+name = "PrintNotify"
+start = "disabled"
+
+[[tweak]]
+id = "services.xbox"
+name = "Turn off Xbox services"
+description = "For PCs that don't use Xbox apps, Game Pass or Xbox controllers' wireless features."
+category = "services"
+risk = "ask"
+restart = "reboot"
+[[tweak.service]]
+name = "XblAuthManager"
+start = "disabled"
+[[tweak.service]]
+name = "XblGameSave"
+start = "disabled"
+[[tweak.service]]
+name = "XboxGipSvc"
+start = "disabled"
+[[tweak.service]]
+name = "XboxNetApiSvc"
+start = "disabled"
+
+[[tweak]]
+id = "services.bluetooth"
+name = "Turn off Bluetooth services"
+description = "For desktops without Bluetooth devices."
+category = "services"
+risk = "ask"
+conditions = ["desktop"]
+restart = "reboot"
+[[tweak.service]]
+name = "bthserv"
+start = "disabled"
+[[tweak.service]]
+name = "BthAvctpSvc"
+start = "disabled"
+[[tweak.service]]
+name = "BTAGService"
+start = "disabled"
+
+[[tweak]]
+id = "services.file_sharing"
+name = "Turn off network file sharing"
+description = "Stops sharing folders and media with other PCs on your network. Also closes common attack paths."
+category = "services"
+risk = "ask"
+restart = "reboot"
+note = "Other PCs won't see your shared folders or printers."
+[[tweak.service]]
+name = "LanmanServer"
+start = "disabled"
+[[tweak.service]]
+name = "FDResPub"
+start = "manual"
+[[tweak.service]]
+name = "SSDPSRV"
+start = "disabled"
+[[tweak.service]]
+name = "upnphost"
+start = "disabled"
+[[tweak.service]]
+name = "WMPNetworkSvc"
+start = "disabled"
+
+[[tweak]]
+id = "services.remote_desktop"
+name = "Turn off Remote Desktop services"
+description = "Nobody can connect to this PC with Remote Desktop."
+category = "services"
+risk = "ask"
+restart = "reboot"
+[[tweak.service]]
+name = "TermService"
+start = "disabled"
+[[tweak.service]]
+name = "UmRdpService"
+start = "disabled"
+[[tweak.service]]
+name = "SessionEnv"
+start = "disabled"
+
+[[tweak]]
+id = "services.biometrics"
+name = "Turn off fingerprint/face sign-in service"
+description = "For PCs without Windows Hello hardware."
+category = "services"
+risk = "ask"
+restart = "reboot"
+[[tweak.service]]
+name = "WbioSrvc"
+start = "disabled"

@@ -24,6 +24,8 @@ zip = { version = "9", default-features = false, features = ["deflate"] }
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.56"
+nvml-wrapper = "0.13"
+trash = "5"
 wmi = "0.18"
 windows = { version = "0.62", features = [
   "Win32_Foundation",
@@ -35,6 +37,7 @@ windows = { version = "0.62", features = [
   "Win32_UI_WindowsAndMessaging",
   "Win32_UI_Input_KeyboardAndMouse",
   "Win32_System_SystemInformation",
+  "Win32_System_Performance",
 ] }
 
 [dev-dependencies]

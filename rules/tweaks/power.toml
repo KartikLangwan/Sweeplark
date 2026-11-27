@@ -1,0 +1,49 @@
+# Optimizer: power.
+
+[[tweak]]
+id = "power.fast_startup_off"
+name = "Turn off Fast Startup"
+description = "A real shutdown every time: fixes many driver, update and dual-boot problems."
+category = "power"
+risk = "safe"
+recommended = true
+restart = "reboot"
+[[tweak.registry]]
+key = 'HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power'
+name = "HiberbootEnabled"
+value = 0
+
+[[tweak]]
+id = "power.hibernate_off"
+name = "Turn off hibernation"
+description = "Deletes hiberfil.sys and frees several GB on the system drive. Desktops rarely need it."
+category = "power"
+risk = "ask"
+conditions = ["desktop"]
+action = "hibernate_off"
+
+[[tweak]]
+id = "power.ultimate_plan"
+name = "Ultimate Performance power plan"
+description = "Adds and switches to Windows' hidden highest-performance plan. Desktops only."
+category = "power"
+risk = "ask"
+conditions = ["desktop"]
+action = "ultimate_plan"
+
+[[tweak]]
+id = "power.standby_network"
+name = "No network while asleep"
+description = "Stops Modern Standby from staying online and draining battery in the bag."
+category = "power"
+risk = "safe"
+conditions = ["laptop"]
+recommended = true
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Power\PowerSettings\f15576e8-98b7-4186-b944-eafa664402d9'
+name = "ACSettingIndex"
+value = 0
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Power\PowerSettings\f15576e8-98b7-4186-b944-eafa664402d9'
+name = "DCSettingIndex"
+value = 0

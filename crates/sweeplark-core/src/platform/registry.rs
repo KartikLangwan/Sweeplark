@@ -46,6 +46,21 @@ pub trait RegistryBackend: Send + Sync {
     fn delete_value(&self, hive: Hive, key: &str, name: &str) -> Result<()>;
     /// All values of a key. A missing key is an empty list, not an error.
     fn list_values(&self, hive: Hive, key: &str) -> Result<Vec<(String, RegValue)>>;
+    /// Names of the direct subkeys of a key (empty if missing).
+    fn list_subkeys(&self, _hive: Hive, _key: &str) -> Result<Vec<String>> {
+        Ok(Vec::new())
+    }
+}
+
+/// Split "HKLM\Software\X" into hive + key.
+pub fn parse_key(full: &str) -> Option<(Hive, String)> {
+    let (root, rest) = full.split_once('\\')?;
+    let hive = match root.to_ascii_uppercase().as_str() {
+        "HKLM" | "HKEY_LOCAL_MACHINE" => Hive::LocalMachine,
+        "HKCU" | "HKEY_CURRENT_USER" => Hive::CurrentUser,
+        _ => return None,
+    };
+    Some((hive, rest.to_string()))
 }
 
 /// In-memory registry for tests and non-Windows builds.
@@ -86,6 +101,19 @@ impl RegistryBackend for MemRegistry {
             .get(&(hive, Self::k(key)))
             .map(|vals| vals.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
             .unwrap_or_default())
+    }
+
+    fn list_subkeys(&self, hive: Hive, key: &str) -> Result<Vec<String>> {
+        let data = self.data.lock().unwrap();
+        let prefix = format!("{}\\", Self::k(key));
+        let mut out: Vec<String> = data
+            .keys()
+            .filter(|(h, k)| *h == hive && k.starts_with(&prefix))
+            .filter_map(|(_, k)| k[prefix.len()..].split('\\').next().map(String::from))
+            .collect();
+        out.sort();
+        out.dedup();
+        Ok(out)
     }
 }
 
@@ -215,6 +243,13 @@ mod win {
                 }
             }
             Ok(out)
+        }
+
+        fn list_subkeys(&self, hive: Hive, key: &str) -> Result<Vec<String>> {
+            match root(hive).open_subkey_with_flags(key, KEY_READ) {
+                Ok(k) => Ok(k.enum_keys().flatten().collect()),
+                Err(_) => Ok(Vec::new()),
+            }
         }
     }
 }

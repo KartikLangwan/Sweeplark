@@ -3,7 +3,7 @@
 
 import type {
   AiStatus, AppInfo, Approval, AssistantReply, ChatEvent, ChatTurn, CleanReport, ChangeRecord, Health, History,
-  Inbox, OptimizePlan, UpdateInfo, OptimizeReport, ScanReport, Settings, StartupItem, Tier, InstallProgress,
+  Inbox, OptimizePlan, UpdateInfo, TweakState, LiveStats, ProcessGroup, StorageReport, ToolId, PowerPlan, OptimizeReport, ScanReport, Settings, StartupItem, Tier, InstallProgress,
 } from "./types";
 
 export const inTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -52,6 +52,21 @@ export const api = {
   updateCheck: (manual = false) => call<UpdateInfo | null>("update_check", { manual }),
   updateInstall: () => call<void>("update_install"),
   updateSkip: (version: string) => call<void>("update_skip", { version }),
+  tweaks: () => call<TweakState[]>("tweaks_list"),
+  tweakSet: (id: string, on: boolean) => call<void>("tweak_set", { id, on }),
+  tweaksApply: (ids: string[]) => call<{ applied: string[]; skipped: [string, string][] }>("tweaks_apply_recommended", { ids }),
+  live: () => call<LiveStats>("live_stats"),
+  processes: () => call<ProcessGroup[]>("process_list"),
+  endProcess: (name: string) => call<number>("process_end", { name }),
+  storage: (path?: string) => call<StorageReport>("storage_analyze", { path: path ?? null }),
+  recycle: (path: string) => call<void>("storage_recycle", { path }),
+  reveal: (path: string) => call<void>("reveal_path", { path }),
+  tool: (tool: ToolId) => call<string>("tool_run", { tool }),
+  shutdown: (minutes: number, restart: boolean) => call<void>("shutdown_schedule", { minutes, restart }),
+  windowsTool: (name: string) => call<void>("windows_tool", { name }),
+  hardware: () => call<{ items: [string, string][] }>("hardware_info"),
+  powerPlans: () => call<PowerPlan[]>("power_plans"),
+  setPowerPlan: (guid: string | null) => call<void>("power_plan_set", { guid }),
   openUrl: (url: string) => (inTauri ? call<void>("open_url", { url }) : Promise.resolve(void window.open(url, "_blank"))),
 
   async chat(question: string, history: ChatTurn[], onEvent: (e: ChatEvent) => void): Promise<AssistantReply> {

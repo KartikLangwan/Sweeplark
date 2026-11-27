@@ -1,0 +1,125 @@
+# Optimizer: graphics driver tweaks. Written to the matching display adapter's driver key.
+
+[[tweak]]
+id = "gpu.nvidia_dynamic_pstate"
+name = "NVIDIA: turn off dynamic P-states"
+description = "Keeps the GPU at higher clocks instead of dropping between power states. Smoother frame times, more power use."
+category = "gpu"
+risk = "ask"
+conditions = ["nvidia", "desktop"]
+restart = "reboot"
+[[tweak.registry]]
+key = '{gpu:nvidia}'
+name = "DisableDynamicPstate"
+value = 1
+
+[[tweak]]
+id = "gpu.nvidia_async_pstates"
+name = "NVIDIA: turn off async P-states"
+description = "Stops asynchronous power-state changes that can cause micro-stutter."
+category = "gpu"
+risk = "ask"
+conditions = ["nvidia", "desktop"]
+restart = "reboot"
+[[tweak.registry]]
+key = '{gpu:nvidia}'
+name = "DisableASyncPstates"
+value = 1
+
+[[tweak]]
+id = "gpu.amd_ulps"
+name = "AMD: turn off ULPS"
+description = "Ultra Low Power State can cause wake-up delays and multi-GPU stutter."
+category = "gpu"
+risk = "expert"
+conditions = ["amd"]
+restart = "reboot"
+[[tweak.registry]]
+key = '{gpu:amd}'
+name = "EnableULPS"
+value = 0
+
+[[tweak]]
+id = "gpu.amd_power_gating"
+name = "AMD: turn off power gating"
+description = "Keeps GPU blocks powered for steadier performance."
+category = "gpu"
+risk = "ask"
+conditions = ["amd", "desktop"]
+restart = "reboot"
+[[tweak.registry]]
+key = '{gpu:amd}'
+name = "DisablePowerGating"
+value = 1
+[[tweak.registry]]
+key = '{gpu:amd}'
+name = "PP_GPUPowerDownEnabled"
+value = 0
+
+[[tweak]]
+id = "gpu.amd_clock_gating"
+name = "AMD: turn off video clock gating"
+description = "Steadier video encode/decode clocks (VCE/UVD)."
+category = "gpu"
+risk = "ask"
+conditions = ["amd"]
+restart = "reboot"
+[[tweak.registry]]
+key = '{gpu:amd}'
+name = "DisableVCEPowerGating"
+value = 1
+[[tweak.registry]]
+key = '{gpu:amd}'
+name = "DisableVceClockGating"
+value = 1
+[[tweak.registry]]
+key = '{gpu:amd}'
+name = "EnableUvdClockGating"
+value = 0
+[[tweak.registry]]
+key = '{gpu:amd}'
+name = "EnableVceSwClockGating"
+value = 0
+
+[[tweak]]
+id = "gpu.amd_aspm"
+name = "AMD: turn off PCIe ASPM"
+description = "Stops the PCIe link from sleeping. Can fix stutter, uses more power."
+category = "gpu"
+risk = "expert"
+conditions = ["amd"]
+restart = "reboot"
+[[tweak.registry]]
+key = '{gpu:amd}'
+name = "EnableAspmL0s"
+value = 0
+[[tweak.registry]]
+key = '{gpu:amd}'
+name = "EnableAspmL1"
+value = 0
+
+[[tweak]]
+id = "gpu.intel_async_flips"
+name = "Intel: turn off async flips"
+description = "Can fix tearing and flicker on Intel graphics."
+category = "gpu"
+risk = "ask"
+conditions = ["intel_gpu"]
+restart = "reboot"
+[[tweak.registry]]
+key = '{gpu:intel}'
+name = "Display1_DisableAsyncFlips"
+value = 1
+
+[[tweak]]
+id = "gpu.intel_adaptive_vsync"
+name = "Intel: turn off adaptive V-Sync"
+description = "Removes the driver's adaptive sync, which can add input lag."
+category = "gpu"
+risk = "ask"
+conditions = ["intel_gpu"]
+restart = "reboot"
+[[tweak.registry]]
+key = '{gpu:intel}'
+name = "AdaptiveVsyncEnable"
+value = 0

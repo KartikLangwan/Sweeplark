@@ -1,0 +1,224 @@
+# Optimizer: performance. Values follow optimizerDuck (GPL-3.0) and Microsoft docs.
+
+[[tweak]]
+id = "perf.background_apps"
+name = "Stop apps running in the background"
+description = "Store apps can't keep running in the background when you are not using them. Saves RAM, CPU and battery."
+category = "performance"
+risk = "ask"
+recommended = true
+note = "Some apps won't update live tiles or send notifications until opened."
+source = "https://learn.microsoft.com/windows/application-management/enterprise-background-activity-controls"
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications'
+name = "GlobalUserDisabled"
+value = 1
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\AppPrivacy'
+name = "LetAppsRunInBackground"
+value = 2
+
+[[tweak]]
+id = "perf.foreground_priority"
+name = "Prioritise the app you are using"
+description = "Gives the window in front shorter, faster CPU time slices (Win32PrioritySeparation 0x26)."
+category = "performance"
+risk = "ask"
+recommended = true
+restart = "reboot"
+[[tweak.registry]]
+key = 'HKLM\SYSTEM\CurrentControlSet\Control\PriorityControl'
+name = "Win32PrioritySeparation"
+value = 38
+
+[[tweak]]
+id = "perf.multimedia_scheduler"
+name = "Optimize the multimedia scheduler"
+description = "Reserves less CPU for background tasks and gives games and media higher priority."
+category = "performance"
+risk = "safe"
+recommended = true
+restart = "reboot"
+source = "https://learn.microsoft.com/windows/win32/procthread/multimedia-class-scheduler-service"
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile'
+name = "SystemResponsiveness"
+value = 10
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games'
+name = "GPU Priority"
+value = 8
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games'
+name = "Priority"
+value = 6
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games'
+name = "Scheduling Category"
+value = "High"
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile\Tasks\Games'
+name = "SFIO Priority"
+value = "High"
+
+[[tweak]]
+id = "perf.startup_delay"
+name = "Remove the startup app delay"
+description = "Windows waits a few seconds after sign-in before starting startup apps. This removes the wait."
+category = "performance"
+risk = "safe"
+recommended = true
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Serialize'
+name = "StartupDelayInMSec"
+value = 0
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Serialize'
+name = "WaitForIdleState"
+value = 0
+
+[[tweak]]
+id = "perf.menu_delay"
+name = "Faster menus"
+description = "Menus open instantly instead of after 0.4 seconds."
+category = "performance"
+risk = "safe"
+recommended = true
+setting = true
+restart = "signout"
+[[tweak.registry]]
+key = 'HKCU\Control Panel\Desktop'
+name = "MenuShowDelay"
+value = "0"
+off = "400"
+
+[[tweak]]
+id = "perf.visual_effects"
+name = "Lighter visual effects"
+description = "Turns off taskbar animations, list shadows, transparency and Aero Peek. Helps slower PCs."
+category = "performance"
+risk = "ask"
+restart = "explorer"
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+name = "TaskbarAnimations"
+value = 0
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+name = "ListviewShadow"
+value = 0
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize'
+name = "EnableTransparency"
+value = 0
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\DWM'
+name = "EnableAeroPeek"
+value = 0
+
+[[tweak]]
+id = "perf.keyboard_latency"
+name = "Faster keyboard repeat"
+description = "Shortest repeat delay and fastest repeat rate for held keys."
+category = "performance"
+risk = "safe"
+setting = true
+restart = "signout"
+[[tweak.registry]]
+key = 'HKCU\Control Panel\Keyboard'
+name = "KeyboardDelay"
+value = "0"
+off = "1"
+[[tweak.registry]]
+key = 'HKCU\Control Panel\Keyboard'
+name = "KeyboardSpeed"
+value = "31"
+off = "31"
+
+[[tweak]]
+id = "perf.accessibility_hotkeys"
+name = "Turn off Sticky/Filter/Toggle Keys shortcuts"
+description = "Stops the pop-up when Shift is pressed five times, which often interrupts games."
+category = "performance"
+risk = "safe"
+recommended = true
+[[tweak.registry]]
+key = 'HKCU\Control Panel\Accessibility\StickyKeys'
+name = "Flags"
+value = "26"
+[[tweak.registry]]
+key = 'HKCU\Control Panel\Accessibility\Keyboard Response'
+name = "Flags"
+value = "2"
+[[tweak.registry]]
+key = 'HKCU\Control Panel\Accessibility\ToggleKeys'
+name = "Flags"
+value = "34"
+
+[[tweak]]
+id = "perf.folder_discovery"
+name = "Stop Explorer guessing folder types"
+description = "Explorer stops scanning folder contents to pick a view, so big folders open faster."
+category = "performance"
+risk = "ask"
+restart = "explorer"
+[[tweak.registry]]
+key = 'HKCU\Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\Bags\AllFolders\Shell'
+name = "FolderType"
+value = "NotSpecified"
+
+[[tweak]]
+id = "perf.ntfs_last_access"
+name = "Stop updating 'last accessed' time on files"
+description = "Saves a disk write every time a file is read."
+category = "performance"
+risk = "safe"
+recommended = true
+restart = "reboot"
+source = "https://learn.microsoft.com/windows-server/administration/windows-commands/fsutil-behavior"
+[[tweak.registry]]
+key = 'HKLM\SYSTEM\CurrentControlSet\Control\FileSystem'
+name = "NtfsDisableLastAccessUpdate"
+value = -2147483645
+
+[[tweak]]
+id = "perf.fast_shutdown"
+name = "Faster shutdown"
+description = "Windows waits less for hung apps when shutting down."
+category = "performance"
+risk = "ask"
+note = "Unsaved work in a frozen app may be lost at shutdown."
+[[tweak.registry]]
+key = 'HKCU\Control Panel\Desktop'
+name = "WaitToKillAppTimeout"
+value = "2000"
+[[tweak.registry]]
+key = 'HKCU\Control Panel\Desktop'
+name = "HungAppTimeout"
+value = "2000"
+
+[[tweak]]
+id = "perf.power_throttling"
+name = "Turn off power throttling"
+description = "Windows stops slowing down background apps to save power. Desktops only."
+category = "performance"
+risk = "ask"
+conditions = ["desktop"]
+restart = "reboot"
+[[tweak.registry]]
+key = 'HKLM\SYSTEM\CurrentControlSet\Control\Power\PowerThrottling'
+name = "PowerThrottlingOff"
+value = 1
+
+[[tweak]]
+id = "perf.memory_integrity"
+name = "Turn off Memory Integrity (HVCI)"
+description = "Can raise game FPS on older CPUs, but lowers protection against kernel attacks."
+category = "performance"
+risk = "expert"
+restart = "reboot"
+note = "Only do this if you know why: it weakens Windows security."
+[[tweak.registry]]
+key = 'HKLM\SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity'
+name = "Enabled"
+value = 0

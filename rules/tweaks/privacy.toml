@@ -1,0 +1,384 @@
+# Optimizer: privacy. Values follow optimizerDuck (GPL-3.0) and Microsoft policy docs.
+
+[[tweak]]
+id = "privacy.telemetry"
+name = "Turn off telemetry"
+description = "Sends the minimum diagnostic data, stops feedback prompts and the telemetry service and tasks."
+category = "privacy"
+risk = "ask"
+recommended = true
+restart = "reboot"
+source = "https://learn.microsoft.com/windows/privacy/configure-windows-diagnostic-data-in-your-organization"
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\DataCollection'
+name = "AllowTelemetry"
+value = 0
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection'
+name = "AllowTelemetry"
+value = 0
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection'
+name = "DoNotShowFeedbackNotifications"
+value = 1
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection'
+name = "AllowDeviceNameInTelemetry"
+value = 0
+[[tweak.registry]]
+key = 'HKCU\SOFTWARE\Microsoft\Siuf\Rules'
+name = "NumberOfSIUFInPeriod"
+value = 0
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\AppCompat'
+name = "AITEnable"
+value = 0
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\AppCompat'
+name = "DisableInventory"
+value = 1
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+name = "Start_TrackProgs"
+value = 0
+[[tweak.service]]
+name = "DiagTrack"
+start = "disabled"
+[[tweak.service]]
+name = "dmwappushservice"
+start = "disabled"
+[[tweak.task]]
+path = '\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser'
+enabled = false
+[[tweak.task]]
+path = '\Microsoft\Windows\Application Experience\ProgramDataUpdater'
+enabled = false
+[[tweak.task]]
+path = '\Microsoft\Windows\Customer Experience Improvement Program\Consolidator'
+enabled = false
+[[tweak.task]]
+path = '\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip'
+enabled = false
+[[tweak.task]]
+path = '\Microsoft\Windows\Autochk\Proxy'
+enabled = false
+[[tweak.task]]
+path = '\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector'
+enabled = false
+
+[[tweak]]
+id = "privacy.error_reporting"
+name = "Turn off error reporting"
+description = "Crash reports are no longer sent to Microsoft."
+category = "privacy"
+risk = "ask"
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Microsoft\Windows\Windows Error Reporting'
+name = "Disabled"
+value = 1
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\HandwritingErrorReports'
+name = "PreventHandwritingErrorReports"
+value = 1
+[[tweak.service]]
+name = "WerSvc"
+start = "manual"
+
+[[tweak]]
+id = "privacy.advertising"
+name = "Turn off ads and suggestions"
+description = "No advertising ID, tailored experiences, suggested apps or 'finish setting up' screens."
+category = "privacy"
+risk = "safe"
+recommended = true
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\AdvertisingInfo'
+name = "DisabledByGroupPolicy"
+value = 1
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\AdvertisingInfo'
+name = "Enabled"
+value = 0
+[[tweak.registry]]
+key = 'HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Privacy'
+name = "TailoredExperiencesWithDiagnosticDataEnabled"
+value = 0
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\CloudContent'
+name = "DisableWindowsConsumerFeatures"
+value = 1
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\CloudContent'
+name = "DisableSoftLanding"
+value = 1
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\CloudContent'
+name = "DisableConsumerAccountStateContent"
+value = 1
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\UserProfileEngagement'
+name = "ScoobeSystemSettingEnabled"
+value = 0
+
+[[tweak]]
+id = "privacy.content_delivery"
+name = "Stop silent app installs and tips"
+description = "Windows stops installing promoted apps and showing tips, tricks and lock-screen ads."
+category = "privacy"
+risk = "safe"
+recommended = true
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager'
+name = "SilentInstalledAppsEnabled"
+value = 0
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager'
+name = "SystemPaneSuggestionsEnabled"
+value = 0
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager'
+name = "SoftLandingEnabled"
+value = 0
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager'
+name = "PreInstalledAppsEnabled"
+value = 0
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager'
+name = "OemPreInstalledAppsEnabled"
+value = 0
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager'
+name = "RotatingLockScreenOverlayEnabled"
+value = 0
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager'
+name = "SubscribedContent-338388Enabled"
+value = 0
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager'
+name = "SubscribedContent-338389Enabled"
+value = 0
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager'
+name = "SubscribedContent-353694Enabled"
+value = 0
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager'
+name = "SubscribedContent-353696Enabled"
+value = 0
+
+[[tweak]]
+id = "privacy.typing"
+name = "Stop sending typing and inking data"
+description = "Windows stops collecting what you type and write to 'improve' recognition."
+category = "privacy"
+risk = "safe"
+recommended = true
+[[tweak.registry]]
+key = 'HKCU\SOFTWARE\Microsoft\InputPersonalization'
+name = "RestrictImplicitInkCollection"
+value = 1
+[[tweak.registry]]
+key = 'HKCU\SOFTWARE\Microsoft\InputPersonalization'
+name = "RestrictImplicitTextCollection"
+value = 1
+[[tweak.registry]]
+key = 'HKCU\SOFTWARE\Microsoft\InputPersonalization\TrainedDataStore'
+name = "HarvestContacts"
+value = 0
+[[tweak.registry]]
+key = 'HKCU\Control Panel\International\User Profile'
+name = "HttpAcceptLanguageOptOut"
+value = 1
+
+[[tweak]]
+id = "privacy.widgets_news"
+name = "Turn off widgets and news"
+description = "Removes the news and weather feed (Widgets / News and Interests)."
+category = "privacy"
+risk = "safe"
+recommended = true
+restart = "explorer"
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Dsh'
+name = "AllowNewsAndInterests"
+value = 0
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Feeds'
+name = "EnableFeeds"
+value = 0
+
+[[tweak]]
+id = "privacy.activity_history"
+name = "Turn off activity history"
+description = "Windows stops recording which apps and files you used."
+category = "privacy"
+risk = "ask"
+recommended = true
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\System'
+name = "PublishUserActivities"
+value = 0
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\System'
+name = "UploadUserActivities"
+value = 0
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\System'
+name = "EnableActivityFeed"
+value = 0
+
+[[tweak]]
+id = "privacy.location"
+name = "Turn off location"
+description = "Apps and Windows can't use your location. Maps stop auto-updating."
+category = "privacy"
+risk = "ask"
+note = "Weather, Maps and Find my device won't know where you are."
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\LocationAndSensors'
+name = "DisableLocation"
+value = 1
+[[tweak.registry]]
+key = 'HKLM\SYSTEM\Maps'
+name = "AutoUpdateEnabled"
+value = 0
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location'
+name = "Value"
+value = "Deny"
+
+[[tweak]]
+id = "privacy.cortana_search"
+name = "Turn off Cortana and cloud search"
+description = "Windows Search stays local: no Cortana, no web results, no location in search."
+category = "privacy"
+risk = "safe"
+recommended = true
+restart = "explorer"
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search'
+name = "AllowCortana"
+value = 0
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search'
+name = "AllowCloudSearch"
+value = 0
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search'
+name = "AllowSearchToUseLocation"
+value = 0
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search'
+name = "ConnectedSearchUseWeb"
+value = 0
+
+[[tweak]]
+id = "privacy.start_web_search"
+name = "No Bing results in Start search"
+description = "Start menu search shows only apps, files and settings on this PC. Faster too."
+category = "privacy"
+risk = "safe"
+recommended = true
+restart = "explorer"
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Search'
+name = "BingSearchEnabled"
+value = 0
+[[tweak.registry]]
+key = 'HKCU\Software\Policies\Microsoft\Windows\Explorer'
+name = "DisableSearchBoxSuggestions"
+value = 1
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\Windows Search'
+name = "DisableWebSearch"
+value = 1
+
+[[tweak]]
+id = "privacy.start_recommended"
+name = "Hide 'Recommended' in Start"
+description = "Removes the recommended files and apps section from the Start menu."
+category = "privacy"
+risk = "safe"
+conditions = ["win11"]
+restart = "explorer"
+[[tweak.registry]]
+key = 'HKCU\SOFTWARE\Policies\Microsoft\Windows\Explorer'
+name = "HideRecommendedSection"
+value = 1
+
+[[tweak]]
+id = "privacy.delivery_optimization"
+name = "Don't share updates with other PCs"
+description = "Windows Update downloads only from Microsoft, not from or to other PCs on the internet."
+category = "privacy"
+risk = "safe"
+recommended = true
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization'
+name = "DODownloadMode"
+value = 0
+
+[[tweak]]
+id = "privacy.find_my_device"
+name = "Turn off Find my device"
+description = "Stops reporting this PC's location to your Microsoft account."
+category = "privacy"
+risk = "ask"
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\FindMyDevice'
+name = "AllowFindMyDevice"
+value = 0
+
+[[tweak]]
+id = "privacy.autologgers"
+name = "Turn off diagnostic auto-loggers"
+description = "Stops background event-tracing sessions that collect telemetry from boot."
+category = "privacy"
+risk = "ask"
+restart = "reboot"
+[[tweak.registry]]
+key = 'HKLM\SYSTEM\CurrentControlSet\Control\WMI\Autologger\Diagtrack-Listener'
+name = "Start"
+value = 0
+[[tweak.registry]]
+key = 'HKLM\SYSTEM\CurrentControlSet\Control\WMI\Autologger\SQMLogger'
+name = "Start"
+value = 0
+[[tweak.registry]]
+key = 'HKLM\SYSTEM\CurrentControlSet\Control\WMI\Autologger\DiagLog'
+name = "Start"
+value = 0
+[[tweak.registry]]
+key = 'HKLM\SYSTEM\CurrentControlSet\Control\WMI\Autologger\WdiContextLog'
+name = "Start"
+value = 0
+[[tweak.registry]]
+key = 'HKLM\SYSTEM\CurrentControlSet\Control\WMI\Autologger\AppModel'
+name = "Start"
+value = 0
+
+[[tweak]]
+id = "privacy.meet_now"
+name = "Hide 'Meet Now'"
+description = "Removes the old Skype Meet Now button from the taskbar."
+category = "privacy"
+risk = "safe"
+restart = "explorer"
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer'
+name = "HideSCAMeetNow"
+value = 1
+
+[[tweak]]
+id = "privacy.speech_online"
+name = "Turn off online speech recognition"
+description = "Your voice is not sent to Microsoft for recognition."
+category = "privacy"
+risk = "safe"
+recommended = true
+[[tweak.registry]]
+key = 'HKCU\SOFTWARE\Microsoft\Speech_OneCore\Settings\OnlineSpeechPrivacy'
+name = "HasAccepted"
+value = 0

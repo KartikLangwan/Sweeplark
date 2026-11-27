@@ -12,17 +12,25 @@
   import Inbox from "./pages/Inbox.svelte";
   import History from "./pages/History.svelte";
   import SettingsPage from "./pages/Settings.svelte";
+  import Optimizer from "./pages/Optimizer.svelte";
+  import Monitor from "./pages/Monitor.svelte";
+  import Storage from "./pages/Storage.svelte";
+  import Tools from "./pages/Tools.svelte";
   import UpdateModal from "./components/UpdateModal.svelte";
 
   const nav = $derived<{ id: Page; label: string; icon: string }[]>([
     { id: "home", label: t("Home", "Home"), icon: "home" },
+    { id: "optimizer", label: t("Optimizer", "Optimizer"), icon: "sparkle" },
     { id: "clean", label: t("Clean", "Safai"), icon: "broom" },
+    { id: "monitor", label: t("Monitor", "Monitor"), icon: "pulse" },
+    { id: "storage", label: t("Storage", "Storage"), icon: "disk" },
     { id: "startup", label: t("Startup", "Startup"), icon: "rocket" },
-    { id: "health", label: t("Health", "Sehat"), icon: "pulse" },
+    { id: "health", label: t("Health", "Sehat"), icon: "shield" },
+    { id: "tools", label: t("Tools", "Tools"), icon: "settings" },
     { id: "assistant", label: t("Assistant", "Assistant"), icon: "chat" },
     { id: "inbox", label: t("Messages", "Messages"), icon: "inbox" },
     { id: "history", label: t("History", "Hisaab"), icon: "history" },
-    { id: "settings", label: t("Settings", "Settings"), icon: "settings" },
+    { id: "settings", label: t("Settings", "Settings"), icon: "info" },
   ]);
 
   onMount(() => {
@@ -79,6 +87,10 @@
     {#key ui.page}
       <div class="page fade">
         {#if ui.page === "home"}<Home />
+        {:else if ui.page === "optimizer"}<Optimizer />
+        {:else if ui.page === "monitor"}<Monitor />
+        {:else if ui.page === "storage"}<Storage />
+        {:else if ui.page === "tools"}<Tools />
         {:else if ui.page === "clean"}<Clean />
         {:else if ui.page === "startup"}<Startup />
         {:else if ui.page === "health"}<Health />
@@ -109,9 +121,9 @@
   .brand strong { display: block; font-size: 21px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.05; }
   .brand strong span { color: var(--teal); }
   .brand small { color: var(--slate); font-size: 11.5px; }
-  nav { display: flex; flex-direction: column; gap: 2px; }
+  nav { display: flex; flex-direction: column; gap: 1px; overflow: auto; }
   .nav-item {
-    display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 12px; border: 0; border-radius: 12px;
+    display: flex; align-items: center; gap: 12px; height: 36px; padding: 0 12px; border: 0; border-radius: 10px;
     background: transparent; color: var(--ink-2); cursor: pointer; font-weight: 520; text-align: left; position: relative;
   }
   .nav-item:hover { background: var(--surface-3); }

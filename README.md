@@ -41,12 +41,18 @@ Not code-signed yet: if SmartScreen appears, click **More info → Run anyway**.
 
 ## Features (v1.4)
 
-- **One-Click Optimize** — scan junk, startup, storage, health and security; show the plan; fix only the safe part; report what changed.
-- **Cleaner** — 40+ rules: Windows temp, thumbnails, crash dumps, error reports, Windows Update leftovers, Recycle Bin (older than N days), Chrome / Edge / Firefox / Brave / Opera / Vivaldi caches, Discord / Teams / Slack, Steam / Epic / Battle.net, GPU shader caches, npm / pip / Gradle / Cargo / Go caches, and opt-in browser history & cookies.
-- **Startup manager** — turn apps on/off the same way Task Manager does, with advice for common apps and one-click undo.
-- **Health** — CPU, RAM, disks, heavy apps, GPU, temperatures, battery wear, disk health, Defender & firewall status, Windows *Efficiency mode* for background hogs.
-- **Background agent** — starts with Windows in the tray: smart alerts (sustained high RAM/CPU, low disk, new startup app, protection off), scheduled auto-clean with an approval gate, daily and weekly reports, quiet hours and a daily notification limit.
-- **Assistant** — ask "Why is my PC slow?" and get an answer grounded in measured facts, with buttons to act.
+- **Optimizer** — 100+ Windows tweaks with one-click *Apply recommended* and an off switch for every one: performance (background apps, foreground priority, multimedia scheduler, startup delay, NTFS), gaming (Game Mode, Game DVR, mouse acceleration, HAGS, fullscreen/windowed optimizations, MPO, network throttling), GPU driver tweaks for NVIDIA / AMD / Intel, power (Fast Startup, hibernation, Ultimate Performance), privacy (telemetry + services + tasks, ads, tips, activity history, location, Cortana/Bing search), Windows AI (Recall, Click to Do, Copilot, Edge/Paint/Notepad AI), services (legacy, Edge background, indexing, SysMain, printing, Xbox, Bluetooth, sharing, Remote Desktop) and Explorer / taskbar / system settings.
+- **One-Click Optimize** — scan junk, startup, storage, health and security; fix only the safe part; report what changed.
+- **Cleaner** — 40+ rules for Windows, browsers, apps, games, GPU shader caches and developer tools, with an approval gate for anything that looks like your files.
+- **Monitor** — live CPU (per core, clock, temperature), GPU usage / VRAM (all vendors) and temperature (NVIDIA), memory, network and disk speed; process list with End and Eco (Efficiency mode).
+- **Storage analyzer** — biggest folders and files and space by file type; remove to the Recycle Bin.
+- **Startup manager** — Task Manager-style on/off with advice and undo.
+- **Health** — disks and disk health, battery wear, Defender and firewall status.
+- **Tools** — SFC, DISM, disk check, Windows Update repair, Explorer restart, icon cache rebuild, DNS flush, network reset, power plans, shutdown timer, hardware details (motherboard, BIOS, RAM sticks, GPU driver) and shortcuts to Windows tools.
+- **Tray** — starts with Windows; hover shows CPU/GPU usage and temperature, RAM and free disk.
+- **Background agent** — smart alerts, scheduled auto-clean with approval, daily and weekly reports.
+- **Offline AI assistant** — answers from measured facts; three model sizes.
+- **Updates** — checks GitHub Releases at startup and asks before updating.
 
 ## How the approval gate works
 
@@ -99,6 +105,11 @@ cargo test
 
 Made by **[Kartik Langwan](https://kartiklangwan.runs-on.dev)** — independent developer, Delhi, India.
 I make websites, tools, apps and Discord bots that feel good to use.
+
+## Credits
+
+Optimizer tweak values follow Microsoft documentation and the open-source
+[optimizerDuck](https://github.com/itsfatduck/optimizerDuck) project (GPL-3.0).
 
 ## License
 

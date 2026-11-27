@@ -1,0 +1,132 @@
+# Optimizer: Windows AI features.
+
+[[tweak]]
+id = "ai.recall"
+name = "Turn off Recall"
+description = "Windows stops taking snapshots of your screen and analysing them."
+category = "ai"
+risk = "safe"
+recommended = true
+conditions = ["win11"]
+source = "https://learn.microsoft.com/windows/client-management/manage-recall"
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsAI'
+name = "DisableAIDataAnalysis"
+value = 1
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsAI'
+name = "AllowRecallEnablement"
+value = 0
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsAI'
+name = "TurnOffSavingSnapshots"
+value = 1
+[[tweak.registry]]
+key = 'HKCU\Software\Policies\Microsoft\Windows\WindowsAI'
+name = "DisableAIDataAnalysis"
+value = 1
+
+[[tweak]]
+id = "ai.click_to_do"
+name = "Turn off Click to Do"
+description = "Removes the AI action overlay on screen content."
+category = "ai"
+risk = "safe"
+recommended = true
+conditions = ["win11"]
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsAI'
+name = "DisableClickToDo"
+value = 1
+[[tweak.registry]]
+key = 'HKCU\Software\Policies\Microsoft\Windows\WindowsAI'
+name = "DisableClickToDo"
+value = 1
+
+[[tweak]]
+id = "ai.copilot"
+name = "Turn off Windows Copilot"
+description = "Removes Copilot from Windows and its taskbar button."
+category = "ai"
+risk = "safe"
+recommended = true
+restart = "explorer"
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot'
+name = "TurnOffWindowsCopilot"
+value = 1
+[[tweak.registry]]
+key = 'HKCU\Software\Policies\Microsoft\Windows\WindowsCopilot'
+name = "TurnOffWindowsCopilot"
+value = 1
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced'
+name = "ShowCopilotButton"
+value = 0
+
+[[tweak]]
+id = "ai.edge"
+name = "Turn off AI in Microsoft Edge"
+description = "No Copilot sidebar, AI compose or page-reading in Edge."
+category = "ai"
+risk = "safe"
+recommended = true
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Edge'
+name = "HubsSidebarEnabled"
+value = 0
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Edge'
+name = "ComposeInlineEnabled"
+value = 0
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Edge'
+name = "CopilotPageContext"
+value = 0
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Edge'
+name = "Microsoft365CopilotChatIconEnabled"
+value = 0
+
+[[tweak]]
+id = "ai.paint"
+name = "Turn off AI in Paint"
+description = "Removes Cocreator, Image Creator and Generative fill from Paint."
+category = "ai"
+risk = "safe"
+conditions = ["win11"]
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Paint'
+name = "DisableCocreator"
+value = 1
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Paint'
+name = "DisableImageCreator"
+value = 1
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Paint'
+name = "DisableGenerativeFill"
+value = 1
+
+[[tweak]]
+id = "ai.notepad"
+name = "Turn off AI in Notepad"
+description = "Removes Rewrite and other AI features from Notepad."
+category = "ai"
+risk = "safe"
+conditions = ["win11"]
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\WindowsNotepad'
+name = "DisableAIFeatures"
+value = 1
+
+[[tweak]]
+id = "ai.fabric_service"
+name = "Don't auto-start the Windows AI service"
+description = "The AI Fabric service starts only when something needs it."
+category = "ai"
+risk = "safe"
+conditions = ["win11"]
+[[tweak.service]]
+name = "WSAIFabricSvc"
+start = "manual"

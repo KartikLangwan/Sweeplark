@@ -1,0 +1,171 @@
+# Optimizer: gaming.
+
+[[tweak]]
+id = "gaming.game_mode"
+name = "Game Mode"
+description = "Windows gives running games priority and pauses updates while you play."
+category = "gaming"
+risk = "safe"
+recommended = true
+setting = true
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\GameBar'
+name = "AutoGameModeEnabled"
+value = 1
+off = 0
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\GameBar'
+name = "AllowAutoGameMode"
+value = 1
+off = 0
+
+[[tweak]]
+id = "gaming.game_dvr"
+name = "Turn off Game Bar recording"
+description = "Stops background game recording (Game DVR), which costs FPS."
+category = "gaming"
+risk = "safe"
+recommended = true
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\GameDVR'
+name = "AppCaptureEnabled"
+value = 0
+[[tweak.registry]]
+key = 'HKCU\System\GameConfigStore'
+name = "GameDVR_Enabled"
+value = 0
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\GameDVR'
+name = "AllowGameDVR"
+value = 0
+
+[[tweak]]
+id = "gaming.game_bar_tips"
+name = "Turn off Game Bar pop-ups"
+description = "No Game Bar tips or controller-button launch."
+category = "gaming"
+risk = "safe"
+setting = true
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\GameBar'
+name = "ShowStartupPanel"
+value = 0
+off = 1
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\GameBar'
+name = "UseNexusForGameBarEnabled"
+value = 0
+off = 1
+
+[[tweak]]
+id = "gaming.mouse_acceleration"
+name = "Turn off mouse acceleration"
+description = "Mouse movement becomes 1:1 (no 'Enhance pointer precision'). Better aim in games."
+category = "gaming"
+risk = "safe"
+setting = true
+restart = "signout"
+[[tweak.registry]]
+key = 'HKCU\Control Panel\Mouse'
+name = "MouseSpeed"
+value = "0"
+off = "1"
+[[tweak.registry]]
+key = 'HKCU\Control Panel\Mouse'
+name = "MouseThreshold1"
+value = "0"
+off = "6"
+[[tweak.registry]]
+key = 'HKCU\Control Panel\Mouse'
+name = "MouseThreshold2"
+value = "0"
+off = "10"
+
+[[tweak]]
+id = "gaming.fullscreen_optimizations"
+name = "Turn off fullscreen optimizations"
+description = "Games use true exclusive fullscreen. Can lower input lag on some systems."
+category = "gaming"
+risk = "ask"
+[[tweak.registry]]
+key = 'HKCU\System\GameConfigStore'
+name = "GameDVR_FSEBehaviorMode"
+value = 2
+[[tweak.registry]]
+key = 'HKCU\System\GameConfigStore'
+name = "GameDVR_HonorUserFSEBehaviorMode"
+value = 1
+[[tweak.registry]]
+key = 'HKCU\System\GameConfigStore'
+name = "GameDVR_FSEBehavior"
+value = 2
+[[tweak.registry]]
+key = 'HKCU\System\GameConfigStore'
+name = "GameDVR_DXGIHonorFSEWindowsCompatible"
+value = 1
+
+[[tweak]]
+id = "gaming.hags"
+name = "Hardware-accelerated GPU scheduling"
+description = "The graphics card manages its own memory. Lower latency on modern GPUs."
+category = "gaming"
+risk = "ask"
+setting = true
+restart = "reboot"
+source = "https://devblogs.microsoft.com/directx/hardware-accelerated-gpu-scheduling/"
+[[tweak.registry]]
+key = 'HKLM\SYSTEM\CurrentControlSet\Control\GraphicsDrivers'
+name = "HwSchMode"
+value = 2
+off = 1
+
+[[tweak]]
+id = "gaming.windowed_optimizations"
+name = "Optimizations for windowed games"
+description = "Lower latency and Auto HDR/VRR for games in windowed or borderless mode."
+category = "gaming"
+risk = "safe"
+setting = true
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\DirectX\UserGpuPreferences'
+name = "DirectXUserGlobalSettings"
+value = "SwapEffectUpgradeEnable=1;"
+off = "SwapEffectUpgradeEnable=0;"
+
+[[tweak]]
+id = "gaming.mpo_off"
+name = "Turn off Multi-Plane Overlay"
+description = "Fixes flicker and stutter some GPUs show with MPO."
+category = "gaming"
+risk = "ask"
+restart = "reboot"
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Microsoft\Windows\Dwm'
+name = "OverlayTestMode"
+value = 5
+
+[[tweak]]
+id = "gaming.network_throttling"
+name = "Turn off network throttling"
+description = "Windows stops limiting network packets while media plays. Can help online games."
+category = "gaming"
+risk = "ask"
+restart = "reboot"
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile'
+name = "NetworkThrottlingIndex"
+value = -1
+
+[[tweak]]
+id = "gaming.dlss_indicator"
+name = "Show the NVIDIA DLSS indicator"
+description = "Shows which DLSS version a game uses, in the corner of the screen."
+category = "gaming"
+risk = "safe"
+setting = true
+conditions = ["nvidia"]
+[[tweak.registry]]
+key = 'HKLM\SOFTWARE\NVIDIA Corporation\Global\NGXCore'
+name = "ShowDlssIndicator"
+value = 1024
+off = 0

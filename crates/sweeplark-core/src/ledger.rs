@@ -193,6 +193,22 @@ impl Ledger {
         Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
+    /// Most recent change of `category` whose details have `"tweak_id": id` and that can still be undone.
+    pub fn latest_undoable(&self, category: &str, tweak_id: &str) -> Result<Option<ChangeRecord>> {
+        Ok(self
+            .conn
+            .query_row(
+                &format!(
+                    "SELECT {} FROM changes WHERE category = ?1 AND json_extract(details, '$.tweak_id') = ?2
+                     AND status IN ('applied', 'partial') ORDER BY id DESC LIMIT 1",
+                    Self::COLS
+                ),
+                params![category, tweak_id],
+                Self::row_to_record,
+            )
+            .optional()?)
+    }
+
     pub fn get(&self, id: i64) -> Result<Option<ChangeRecord>> {
         Ok(self
             .conn

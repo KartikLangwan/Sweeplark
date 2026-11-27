@@ -22,4 +22,5 @@ tauri-plugin-notification = "2.8"
 tauri-plugin-single-instance = "2.5"
 tauri-plugin-autostart = "2.7"
 sysinfo = "0.40"
+directories = "6"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }

@@ -125,3 +125,24 @@ export interface AppInfo {
 export interface UpdateInfo {
   version: string; notes: string; published_at: string; page_url: string; setup_url: string | null; setup_size: number; setup_sha256: string | null;
 }
+
+export type TweakCategory = "performance" | "gaming" | "gpu" | "power" | "privacy" | "ai" | "services" | "explorer" | "taskbar" | "system";
+export interface TweakState {
+  id: string; name: string; description: string; category: TweakCategory; risk: Risk; recommended: boolean; setting: boolean;
+  restart: "explorer" | "signout" | "reboot" | null; note: string | null; source: string | null; needs_admin: boolean;
+  available: boolean; applied: boolean; can_undo: boolean;
+}
+export interface LiveStats {
+  cpu_percent: number; per_core: number[]; cpu_mhz: number; cpu_temp: number | null; ram_used: number; ram_total: number;
+  swap_used: number; swap_total: number; gpu_name: string | null; gpu_percent: number | null; gpu_temp: number | null;
+  vram_used: number | null; vram_total: number | null; net_down_bps: number; net_up_bps: number;
+  disk_read_bps: number | null; disk_write_bps: number | null; processes: number;
+}
+export interface ProcessGroup { name: string; pids: number[]; cpu_percent: number; memory_bytes: number; system: boolean }
+export interface SizedPath { path: string; bytes: number; files: number }
+export interface StorageReport {
+  root: string; total_bytes: number; total_files: number; folders: SizedPath[]; big_files: SizedPath[];
+  by_kind: [string, number][]; complete: boolean; duration_ms: number;
+}
+export type ToolId = "flush_dns" | "restart_explorer" | "rebuild_icon_cache" | "sfc" | "dism" | "reset_network" | "reset_windows_update" | "disk_check" | "cancel_shutdown";
+export interface PowerPlan { guid: string; name: string; active: boolean }
