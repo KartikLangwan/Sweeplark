@@ -146,3 +146,7 @@ export interface StorageReport {
 }
 export type ToolId = "flush_dns" | "restart_explorer" | "rebuild_icon_cache" | "sfc" | "dism" | "reset_network" | "reset_windows_update" | "disk_check" | "cancel_shutdown";
 export interface PowerPlan { guid: string; name: string; active: boolean }
+export interface BoostApp { name: string; pids: number[]; memory_bytes: number; cpu_percent: number; gpu_percent: number }
+export interface BoostPlan { ram_used: number; ram_total: number; cpu_percent: number; gpu_percent: number | null; foreground: string | null; apps: BoostApp[]; can_purge_standby: boolean }
+export interface BoostOptions { trim_ram: boolean; purge_standby: boolean; eco_cpu: boolean; eco_gpu: boolean; high_performance: boolean; apps: string[] }
+export interface BoostReport { ram_before: number; ram_after: number; trimmed: number; standby_purged: boolean; eco: string[]; power_plan: string | null; errors: string[] }

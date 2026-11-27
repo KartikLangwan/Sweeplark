@@ -163,6 +163,9 @@ export async function mock<T>(cmd: string, args: Record<string, unknown> = {}): 
     approval_decide: { freed_bytes: 1.6 * GB, deleted_files: 8348, ledger_id: 8, outcomes: [] },
     ai_status: aiStatus,
     efficiency_mode: 7,
+    boost_plan: { ram_used: 6.9 * GB, ram_total: 8 * GB, cpu_percent: 41, gpu_percent: 37, foreground: "chrome", can_purge_standby: false,
+      apps: [["Teams", 1.1 * GB, 6.2, 0], ["Code", 820 * MB, 1.1, 0], ["Spotify", 340 * MB, 0.6, 0], ["Discord", 410 * MB, 2.4, 4.8], ["OneDrive", 120 * MB, 3.9, 0], ["steamwebhelper", 380 * MB, 1.2, 6.1]].map(([name, m, c, g]) => ({ name, pids: [1, 2], memory_bytes: m, cpu_percent: c, gpu_percent: g })) },
+    boost_apply: { ram_before: 6.9 * GB, ram_after: 5.6 * GB, trimmed: 31, standby_purged: false, eco: ["Teams", "Discord", "OneDrive"], power_plan: "High performance", errors: [] },
     tweaks_list: [
       ["perf.background_apps", "Stop apps running in the background", "performance", "ask", true, false, null, false],
       ["perf.multimedia_scheduler", "Optimize the multimedia scheduler", "performance", "safe", true, false, "reboot", true],

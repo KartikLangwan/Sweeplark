@@ -183,6 +183,8 @@ pub fn run() {
             pc::hardware_info,
             pc::power_plans,
             pc::power_plan_set,
+            pc::boost_plan,
+            pc::boost_apply,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Sweeplark");

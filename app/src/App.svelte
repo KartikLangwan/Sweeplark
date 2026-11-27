@@ -13,6 +13,7 @@
   import History from "./pages/History.svelte";
   import SettingsPage from "./pages/Settings.svelte";
   import Optimizer from "./pages/Optimizer.svelte";
+  import Boost from "./pages/Boost.svelte";
   import Monitor from "./pages/Monitor.svelte";
   import Storage from "./pages/Storage.svelte";
   import Tools from "./pages/Tools.svelte";
@@ -20,11 +21,12 @@
 
   const nav = $derived<{ id: Page; label: string; icon: string }[]>([
     { id: "home", label: t("Home", "Home"), icon: "home" },
+    { id: "boost", label: t("Boost", "Boost"), icon: "rocket" },
     { id: "optimizer", label: t("Optimizer", "Optimizer"), icon: "sparkle" },
     { id: "clean", label: t("Clean", "Safai"), icon: "broom" },
     { id: "monitor", label: t("Monitor", "Monitor"), icon: "pulse" },
     { id: "storage", label: t("Storage", "Storage"), icon: "disk" },
-    { id: "startup", label: t("Startup", "Startup"), icon: "rocket" },
+    { id: "startup", label: t("Startup", "Startup"), icon: "leaf" },
     { id: "health", label: t("Health", "Sehat"), icon: "shield" },
     { id: "tools", label: t("Tools", "Tools"), icon: "settings" },
     { id: "assistant", label: t("Assistant", "Assistant"), icon: "chat" },
@@ -87,6 +89,7 @@
     {#key ui.page}
       <div class="page fade">
         {#if ui.page === "home"}<Home />
+        {:else if ui.page === "boost"}<Boost />
         {:else if ui.page === "optimizer"}<Optimizer />
         {:else if ui.page === "monitor"}<Monitor />
         {:else if ui.page === "storage"}<Storage />

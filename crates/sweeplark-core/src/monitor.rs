@@ -148,6 +148,22 @@ impl Monitor {
         list
     }
 
+    /// GPU use per process id (Windows only; empty elsewhere).
+    pub fn gpu_per_process(&mut self) -> Vec<(u32, f32)> {
+        self.gpu.per_process()
+    }
+
+    /// Fresh process table for Boost: (pid, name, cpu % of whole CPU, working set bytes).
+    pub fn raw_processes(&mut self) -> Vec<(u32, String, f32, u64)> {
+        self.sys.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing().with_cpu().with_memory());
+        let cores = self.sys.cpus().len().max(1) as f32;
+        self.sys
+            .processes()
+            .iter()
+            .map(|(pid, p)| (pid.as_u32(), p.name().to_string_lossy().into_owned(), p.cpu_usage() / cores, p.memory()))
+            .collect()
+    }
+
     /// End every process of an app. Windows and Sweeplark's own processes are refused.
     pub fn end_app(&mut self, name: &str) -> crate::Result<u32> {
         if is_system_process(name) {
@@ -191,6 +207,9 @@ mod gpu {
         pub fn read(&mut self) -> GpuSample {
             GpuSample::default()
         }
+        pub fn per_process(&mut self) -> Vec<(u32, f32)> {
+            Vec::new()
+        }
     }
 }
 
@@ -208,6 +227,7 @@ mod gpu {
     struct Pdh {
         query: PDH_HQUERY,
         gpu_3d: PDH_HCOUNTER,
+        gpu_all: PDH_HCOUNTER,
         vram: PDH_HCOUNTER,
         disk_read: PDH_HCOUNTER,
         disk_write: PDH_HCOUNTER,
@@ -229,6 +249,7 @@ mod gpu {
                 let pdh = Pdh {
                     query,
                     gpu_3d: add(r"\GPU Engine(*engtype_3D)\Utilization Percentage"),
+                    gpu_all: add(r"\GPU Engine(*)\Utilization Percentage"),
                     vram: add(r"\GPU Adapter Memory(*)\Dedicated Usage"),
                     disk_read: add(r"\PhysicalDisk(_Total)\Disk Read Bytes/sec"),
                     disk_write: add(r"\PhysicalDisk(_Total)\Disk Write Bytes/sec"),
@@ -239,8 +260,12 @@ mod gpu {
             }
         }
 
-        /// All instance values of a (wildcard) counter.
         fn values(&self, counter: PDH_HCOUNTER) -> Option<Vec<f64>> {
+            self.named(counter).map(|v| v.into_iter().map(|(_, x)| x).collect())
+        }
+
+        /// All instance (name, value) pairs of a (wildcard) counter.
+        fn named(&self, counter: PDH_HCOUNTER) -> Option<Vec<(String, f64)>> {
             if counter.is_invalid() {
                 return None;
             }
@@ -258,7 +283,7 @@ mod gpu {
                     buf.iter()
                         .take(count as usize)
                         .filter(|i| i.FmtValue.CStatus == 0)
-                        .map(|i| i.FmtValue.Anonymous.doubleValue)
+                        .map(|i| (i.szName.to_string().unwrap_or_default(), i.FmtValue.Anonymous.doubleValue))
                         .collect(),
                 )
             }
@@ -286,6 +311,21 @@ mod gpu {
         pub fn new() -> Self {
             // NVML ships with the NVIDIA driver; on other PCs this simply fails.
             Self { pdh: Pdh::new(), nvml: nvml_wrapper::Nvml::init().ok() }
+        }
+
+        /// GPU use per process id (all engines), from instance names like `pid_1234_luid_..._engtype_3D`.
+        pub fn per_process(&mut self) -> Vec<(u32, f32)> {
+            let Some(p) = &self.pdh else { return Vec::new() };
+            unsafe {
+                PdhCollectQueryData(p.query);
+            }
+            let mut map: std::collections::HashMap<u32, f64> = std::collections::HashMap::new();
+            for (name, v) in p.named(p.gpu_all).unwrap_or_default() {
+                if let Some(pid) = name.strip_prefix("pid_").and_then(|r| r.split('_').next()).and_then(|n| n.parse().ok()) {
+                    *map.entry(pid).or_default() += v;
+                }
+            }
+            map.into_iter().filter(|(_, v)| *v > 0.5).map(|(k, v)| (k, v.min(100.0) as f32)).collect()
         }
 
         pub fn read(&mut self) -> GpuSample {

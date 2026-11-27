@@ -11,6 +11,11 @@ on:
 permissions:
   contents: write
 
+# A newer push replaces an older build of the same version.
+concurrency:
+  group: release
+  cancel-in-progress: true
+
 jobs:
   windows:
     runs-on: windows-latest

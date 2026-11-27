@@ -10,6 +10,7 @@ pub mod advisor;
 pub mod agent;
 pub mod ai;
 pub mod branding;
+pub mod boost;
 pub mod cleaner;
 pub mod error;
 pub mod health;

@@ -86,6 +86,15 @@ mod other {
     pub fn set_efficiency_mode(_pid: u32, _on: bool) -> crate::Result<()> {
         Err(crate::Error::NotSupported("efficiency mode".into()))
     }
+    pub fn foreground_pid() -> Option<u32> {
+        None
+    }
+    pub fn trim_working_set(_pid: u32) -> bool {
+        false
+    }
+    pub fn purge_standby_list() -> crate::Result<()> {
+        Err(crate::Error::NotSupported("standby list".into()))
+    }
 }
 
 #[cfg(windows)]
@@ -120,6 +129,62 @@ mod win {
                 return 0;
             }
             u64::from(GetTickCount().wrapping_sub(info.dwTime)) / 1000
+        }
+    }
+
+    /// Process id of the window in front.
+    pub fn foreground_pid() -> Option<u32> {
+        use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
+        unsafe {
+            let hwnd = GetForegroundWindow();
+            if hwnd.0.is_null() {
+                return None;
+            }
+            let mut pid = 0u32;
+            GetWindowThreadProcessId(hwnd, Some(&mut pid));
+            (pid != 0).then_some(pid)
+        }
+    }
+
+    /// Ask Windows to move a process's unused pages out of RAM (it pages them back on use).
+    pub fn trim_working_set(pid: u32) -> bool {
+        use windows::Win32::System::ProcessStatus::K32EmptyWorkingSet;
+        use windows::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SET_QUOTA};
+        unsafe {
+            let Ok(h) = OpenProcess(PROCESS_SET_QUOTA | PROCESS_QUERY_LIMITED_INFORMATION, false, pid) else { return false };
+            let ok = K32EmptyWorkingSet(h).as_bool();
+            let _ = CloseHandle(h);
+            ok
+        }
+    }
+
+    /// Empty the standby list (cached file pages), like Sysinternals RAMMap. Needs admin.
+    pub fn purge_standby_list() -> crate::Result<()> {
+        use windows::Win32::Security::{
+            AdjustTokenPrivileges, LUID_AND_ATTRIBUTES, LookupPrivilegeValueW, SE_PRIVILEGE_ENABLED, TOKEN_ADJUST_PRIVILEGES,
+            TOKEN_PRIVILEGES,
+        };
+        #[link(name = "ntdll")]
+        unsafe extern "system" {
+            fn NtSetSystemInformation(class: i32, info: *const core::ffi::c_void, len: u32) -> i32;
+        }
+        const SYSTEM_MEMORY_LIST_INFORMATION: i32 = 80;
+        const MEMORY_PURGE_STANDBY_LIST: i32 = 4;
+        if !is_admin() {
+            return Err(crate::Error::NeedsAdmin("purge standby list".into()));
+        }
+        unsafe {
+            let mut token = HANDLE::default();
+            OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &mut token)
+                .map_err(|e| crate::Error::Other(e.to_string()))?;
+            let mut tp = TOKEN_PRIVILEGES { PrivilegeCount: 1, Privileges: [LUID_AND_ATTRIBUTES { Attributes: SE_PRIVILEGE_ENABLED, ..Default::default() }] };
+            let name: Vec<u16> = "SeProfileSingleProcessPrivilege".encode_utf16().chain(std::iter::once(0)).collect();
+            let _ = LookupPrivilegeValueW(PCWSTR::null(), PCWSTR(name.as_ptr()), &mut tp.Privileges[0].Luid);
+            let _ = AdjustTokenPrivileges(token, false, Some(&tp), 0, None, None);
+            let _ = CloseHandle(token);
+            let cmd = MEMORY_PURGE_STANDBY_LIST;
+            let status = NtSetSystemInformation(SYSTEM_MEMORY_LIST_INFORMATION, (&cmd as *const i32).cast(), 4);
+            if status >= 0 { Ok(()) } else { Err(crate::Error::Other(format!("standby purge failed (0x{status:08x})"))) }
         }
     }
 

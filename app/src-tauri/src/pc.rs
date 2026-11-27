@@ -154,3 +154,39 @@ pub async fn power_plan_set(guid: Option<String>) -> CmdResult<()> {
     })
     .await
 }
+
+#[tauri::command]
+pub async fn boost_plan(app: AppHandle) -> CmdResult<sweeplark_core::boost::BoostPlan> {
+    blocking(move || {
+        let state = app.state::<AppState>();
+        let mut m = state.monitor.lock().map_err(err)?;
+        Ok(sweeplark_core::boost::plan(&mut m))
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn boost_apply(app: AppHandle, options: sweeplark_core::boost::BoostOptions) -> CmdResult<sweeplark_core::boost::BoostReport> {
+    blocking(move || {
+        let state = app.state::<AppState>();
+        let report = {
+            let mut m = state.monitor.lock().map_err(err)?;
+            sweeplark_core::boost::apply(&mut m, &options)
+        };
+        let freed = report.ram_before.saturating_sub(report.ram_after);
+        if let Ok(ledger) = state.ledger.lock() {
+            let _ = ledger.record(&sweeplark_core::ledger::NewChange {
+                category: "optimize".into(),
+                title: format!("Boost: {} RAM freed, {} apps in Eco mode", sweeplark_core::util::format_bytes(freed), report.eco.len()),
+                risk: sweeplark_core::Risk::Safe,
+                status: sweeplark_core::ledger::ChangeStatus::Applied,
+                bytes_freed: 0,
+                items: u64::from(report.trimmed),
+                details: serde_json::to_value(&report).unwrap_or_default(),
+                revert: Vec::new(),
+            });
+        }
+        Ok(report)
+    })
+    .await
+}

@@ -3,7 +3,7 @@
 
 import type {
   AiStatus, AppInfo, Approval, AssistantReply, ChatEvent, ChatTurn, CleanReport, ChangeRecord, Health, History,
-  Inbox, OptimizePlan, UpdateInfo, TweakState, LiveStats, ProcessGroup, StorageReport, ToolId, PowerPlan, OptimizeReport, ScanReport, Settings, StartupItem, Tier, InstallProgress,
+  Inbox, OptimizePlan, UpdateInfo, TweakState, LiveStats, ProcessGroup, StorageReport, ToolId, PowerPlan, BoostPlan, BoostOptions, BoostReport, OptimizeReport, ScanReport, Settings, StartupItem, Tier, InstallProgress,
 } from "./types";
 
 export const inTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -67,6 +67,8 @@ export const api = {
   hardware: () => call<{ items: [string, string][] }>("hardware_info"),
   powerPlans: () => call<PowerPlan[]>("power_plans"),
   setPowerPlan: (guid: string | null) => call<void>("power_plan_set", { guid }),
+  boostPlan: () => call<BoostPlan>("boost_plan"),
+  boostApply: (options: BoostOptions) => call<BoostReport>("boost_apply", { options }),
   openUrl: (url: string) => (inTauri ? call<void>("open_url", { url }) : Promise.resolve(void window.open(url, "_blank"))),
 
   async chat(question: string, history: ChatTurn[], onEvent: (e: ChatEvent) => void): Promise<AssistantReply> {

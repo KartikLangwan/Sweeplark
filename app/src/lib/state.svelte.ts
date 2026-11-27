@@ -1,7 +1,7 @@
 import { api } from "./api";
 import type { AppInfo, Settings } from "./types";
 
-export type Page = "home" | "optimizer" | "clean" | "monitor" | "storage" | "startup" | "health" | "tools" | "assistant" | "inbox" | "history" | "settings";
+export type Page = "home" | "boost" | "optimizer" | "clean" | "monitor" | "storage" | "startup" | "health" | "tools" | "assistant" | "inbox" | "history" | "settings";
 
 export const ui = $state({
   page: "home" as Page,

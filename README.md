@@ -42,6 +42,7 @@ Not code-signed yet: if SmartScreen appears, click **More info → Run anyway**.
 ## Features (v1.4)
 
 - **Optimizer** — 100+ Windows tweaks with one-click *Apply recommended* and an off switch for every one: performance (background apps, foreground priority, multimedia scheduler, startup delay, NTFS), gaming (Game Mode, Game DVR, mouse acceleration, HAGS, fullscreen/windowed optimizations, MPO, network throttling), GPU driver tweaks for NVIDIA / AMD / Intel, power (Fast Startup, hibernation, Ultimate Performance), privacy (telemetry + services + tasks, ads, tips, activity history, location, Cortana/Bing search), Windows AI (Recall, Click to Do, Copilot, Edge/Paint/Notepad AI), services (legacy, Edge background, indexing, SysMain, printing, Xbox, Bluetooth, sharing, Remote Desktop) and Explorer / taskbar / system settings.
+- **Boost** — one click, you choose: free RAM from background apps (working-set trim), clear standby memory (admin, like RAMMap), put CPU- and GPU-heavy background apps into Efficiency mode, switch to a high-performance plan. The app in front is never touched.
 - **One-Click Optimize** — scan junk, startup, storage, health and security; fix only the safe part; report what changed.
 - **Cleaner** — 40+ rules for Windows, browsers, apps, games, GPU shader caches and developer tools, with an approval gate for anything that looks like your files.
 - **Monitor** — live CPU (per core, clock, temperature), GPU usage / VRAM (all vendors) and temperature (NVIDIA), memory, network and disk speed; process list with End and Eco (Efficiency mode).
