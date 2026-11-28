@@ -371,7 +371,13 @@ mod win {
                 return None;
             }
             let m = mi.rcMonitor;
-            let full = r.left <= m.left && r.top <= m.top && r.right >= m.right && r.bottom >= m.bottom;
+            let covers = r.left <= m.left && r.top <= m.top && r.right >= m.right && r.bottom >= m.bottom;
+            // A maximized normal window also covers the screen when the taskbar auto-hides;
+            // games and full-screen video have no title bar and are not "maximized".
+            use windows::Win32::UI::WindowsAndMessaging::{GWL_STYLE, GetWindowLongW, WS_CAPTION, WS_MAXIMIZE};
+            let style = GetWindowLongW(hwnd, GWL_STYLE) as u32;
+            let normal_window = (style & WS_CAPTION.0) == WS_CAPTION.0 || (style & WS_MAXIMIZE.0) != 0;
+            let full = covers && !normal_window;
             let pid = pid_of(hwnd);
             if !full || pid == 0 || pid == std::process::id() {
                 return None;
