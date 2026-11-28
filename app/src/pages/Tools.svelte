@@ -42,7 +42,9 @@
     try { await api.setPowerPlan(guid); plans = await api.powerPlans(); toast(t("Power plan changed", "Power plan badal gaya")); }
     catch (e) { toast(String(e), "warn"); }
   }
+  let askShutdown = $state<boolean | null>(null); // true = restart, false = shut down
   async function shutdown(restart: boolean) {
+    askShutdown = null;
     try { await api.shutdown(minutes, restart); toast(t(`PC will ${restart ? "restart" : "shut down"} in ${minutes} min`, `PC ${minutes} min mein ${restart ? "restart" : "band"} hoga`)); }
     catch (e) { toast(String(e), "warn"); }
   }
@@ -116,8 +118,8 @@
         <label class="field"><span class="muted small">{t("Minutes from now", "Abhi se kitne minute")}</span>
           <input type="number" min="1" max="1440" bind:value={minutes} style="width:110px" /></label>
         <div class="row wrap">
-          <button class="btn" onclick={() => shutdown(false)}>{t("Shut down", "Band karo")}</button>
-          <button class="btn" onclick={() => shutdown(true)}>{t("Restart", "Restart")}</button>
+          <button class="btn" onclick={() => (askShutdown = false)}>{t("Shut down", "Band karo")}</button>
+          <button class="btn" onclick={() => (askShutdown = true)}>{t("Restart", "Restart")}</button>
           <button class="btn ghost" onclick={() => run("cancel_shutdown")}>{t("Cancel timer", "Timer cancel")}</button>
         </div>
       </div>
@@ -140,7 +142,12 @@
   </div>
 </section>
 
-<Modal open={ask !== null} title={ask?.title ?? ""}>
+<Modal open={askShutdown !== null} onclose={() => (askShutdown = null)} title={askShutdown ? t("Restart the PC later?", "PC baad mein restart karein?") : t("Shut down the PC later?", "PC baad mein band karein?")}>
+  <p class="muted">{t(`In ${minutes} minutes, at about ${new Date(Date.now() + minutes * 60000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}. Save your work before then. "Cancel timer" stops it.`, `${minutes} minute mein, lagbhag ${new Date(Date.now() + minutes * 60000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} baje. Usse pehle kaam save kar lein. "Timer cancel" se rok sakte hain.`)}</p>
+  {#snippet footer()}<button class="btn" onclick={() => (askShutdown = null)}>{t("Cancel", "Ruko")}</button><button class="btn primary" onclick={() => askShutdown !== null && shutdown(askShutdown)}>{t("Set timer", "Timer lagao")}</button>{/snippet}
+</Modal>
+
+<Modal open={ask !== null} onclose={() => (ask = null)} title={ask?.title ?? ""}>
   <p class="muted">{ask?.text}</p>
   {#snippet footer()}<button class="btn" onclick={() => (ask = null)}>{t("Cancel", "Ruko")}</button><button class="btn primary" onclick={() => ask && run(ask.id)}>{t("Run", "Chalao")}</button>{/snippet}
 </Modal>

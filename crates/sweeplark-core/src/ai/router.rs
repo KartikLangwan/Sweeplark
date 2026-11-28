@@ -68,7 +68,7 @@ pub fn route(question: &str) -> BTreeSet<Tool> {
     let q = format!(" {} ", question.to_lowercase());
     let mut tools: BTreeSet<Tool> = [Tool::Specs, Tool::Problems].into();
     for (tool, words) in RULES {
-        if words.iter().any(|w| q.contains(w)) {
+        if words.iter().any(|w| crate::util::has_word(&q, w.trim())) {
             tools.insert(*tool);
         }
     }

@@ -121,6 +121,7 @@ impl Ledger {
             std::fs::create_dir_all(parent)?;
         }
         let conn = Connection::open(path)?;
+        conn.busy_timeout(std::time::Duration::from_secs(5))?;
         conn.pragma_update(None, "journal_mode", "WAL")?;
         Self::init(conn)
     }
@@ -200,7 +201,7 @@ impl Ledger {
             .query_row(
                 &format!(
                     "SELECT {} FROM changes WHERE category = ?1 AND json_extract(details, '$.tweak_id') = ?2
-                     AND status IN ('applied', 'partial') ORDER BY id DESC LIMIT 1",
+                     AND revert != '[]' AND status IN ('applied', 'partial') ORDER BY id DESC LIMIT 1",
                     Self::COLS
                 ),
                 params![category, tweak_id],
@@ -251,6 +252,9 @@ impl Ledger {
         let record = self.get(id)?.ok_or_else(|| Error::NotFound(format!("change #{id}")))?;
         if record.status == ChangeStatus::Reverted {
             return Err(Error::Other(format!("change #{id} was already undone")));
+        }
+        if record.status == ChangeStatus::Failed {
+            return Err(Error::Other(format!("change #{id} never took effect, so there is nothing to undo")));
         }
         if record.revert.is_empty() {
             return Err(Error::Other(format!("change #{id} cannot be undone (deleted cache does not come back)")));

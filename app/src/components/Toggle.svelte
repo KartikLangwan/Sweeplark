@@ -1,10 +1,13 @@
 <script lang="ts">
-  let { checked = $bindable(false), disabled = false, label = "", onchange }:
-    { checked?: boolean; disabled?: boolean; label?: string; onchange?: (v: boolean) => void } = $props();
+  // Switch. With `bind:checked` it flips by itself. Without binding (the parent passes the
+  // real value), it only asks `onchange` and waits: if saving fails, it does not show a state
+  // that isn't true.
+  let { checked = $bindable(false), disabled = false, label = "", onchange, controlled = false }:
+    { checked?: boolean; disabled?: boolean; label?: string; onchange?: (v: boolean) => void; controlled?: boolean } = $props();
 </script>
 
 <button type="button" class="toggle" class:on={checked} {disabled} role="switch" aria-checked={checked} aria-label={label}
-  onclick={() => { checked = !checked; onchange?.(checked); }}>
+  onclick={() => { if (controlled) { onchange?.(!checked); } else { checked = !checked; onchange?.(checked); } }}>
   <span></span>
 </button>
 

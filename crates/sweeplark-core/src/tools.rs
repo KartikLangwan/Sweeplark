@@ -79,21 +79,21 @@ pub fn run_tool(tool: Tool) -> Result<String> {
         Tool::RestartExplorer => restart_explorer().map(|_| "Explorer restarted".into()),
         Tool::RebuildIconCache => {
             let _ = run("ie4uinit.exe", &["-show"]);
-            if let Ok(local) = std::env::var("LOCALAPPDATA") {
-                let dir = std::path::Path::new(&local).join(r"Microsoft\Windows\Explorer");
-                let _ = run("taskkill", &["/F", "/IM", "explorer.exe"]);
-                if let Ok(rd) = std::fs::read_dir(&dir) {
-                    for e in rd.flatten() {
-                        let n = e.file_name().to_string_lossy().to_lowercase();
-                        if n.starts_with("iconcache") && n.ends_with(".db") {
-                            let _ = std::fs::remove_file(e.path());
-                        }
+            let local = std::env::var("LOCALAPPDATA").map_err(|_| Error::NotFound("LOCALAPPDATA".into()))?;
+            let dir = std::path::Path::new(&local).join(r"Microsoft\Windows\Explorer");
+            let _ = run("taskkill", &["/F", "/IM", "explorer.exe"]);
+            std::thread::sleep(std::time::Duration::from_millis(500));
+            if let Ok(rd) = std::fs::read_dir(&dir) {
+                for e in rd.flatten() {
+                    let n = e.file_name().to_string_lossy().to_lowercase();
+                    if n.starts_with("iconcache") && n.ends_with(".db") {
+                        let _ = std::fs::remove_file(e.path());
                     }
                 }
-                let _ = std::fs::remove_file(std::path::Path::new(&local).join("IconCache.db"));
-                std::thread::sleep(std::time::Duration::from_millis(500));
-                std::process::Command::new(ops::system_exe("explorer.exe")).spawn().map_err(|e| Error::Other(e.to_string()))?;
             }
+            let _ = std::fs::remove_file(std::path::Path::new(&local).join("IconCache.db"));
+            // Always bring the desktop back, even if a file could not be removed.
+            std::process::Command::new(ops::system_exe("explorer.exe")).spawn().map_err(|e| Error::Other(e.to_string()))?;
             Ok("Icon cache rebuilt".into())
         }
         Tool::Sfc => elevated_console("sfc /scannow").map(|_| "System file check started".into()),
@@ -108,7 +108,8 @@ pub fn run_tool(tool: Tool) -> Result<String> {
         .map(|_| "Restore point started".into()),
         Tool::RestorePoint => create_restore_point("manual").map(|_| "Restore point created".into()),
         Tool::ResetNetwork => elevated_console(
-            "netsh winsock reset && netsh int ip reset && ipconfig /release && ipconfig /renew && ipconfig /flushdns && echo. && echo Restart the PC to finish.",
+            // "&": every step runs (ipconfig /release fails on fixed-IP PCs; the rest still matters).
+            "netsh winsock reset & netsh int ip reset & ipconfig /release & ipconfig /renew & ipconfig /flushdns & echo. & echo Restart the PC to finish.",
         )
         .map(|_| "Network reset started".into()),
         // Every step runs even if one fails ("&"), so the services are always started again,

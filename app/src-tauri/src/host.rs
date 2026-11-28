@@ -55,7 +55,7 @@ impl AgentHost for TauriHost<'_> {
 
     fn release_model(&mut self) {
         if self.loaded_by_tick {
-            self.app.state::<AppState>().ai.unload();
+            self.app.state::<AppState>().ai.unload_gentle();
             self.loaded_by_tick = false;
         }
     }

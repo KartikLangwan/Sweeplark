@@ -51,7 +51,8 @@ name = "Stop Edge running in the background"
 description = "Edge no longer preloads at sign-in or keeps running after you close it."
 category = "services"
 risk = "safe"
-recommended = true
+note = "Edge security updates may arrive a little later."
+note_hi = "Edge ke security updates thoda der se aa sakte hain."
 [[tweak.registry]]
 key = 'HKLM\SOFTWARE\Policies\Microsoft\Edge'
 name = "StartupBoostEnabled"

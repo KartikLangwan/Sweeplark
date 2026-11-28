@@ -131,7 +131,21 @@ impl KnownApps {
     }
 
     fn advise(&self, name: &str, command: &str) -> (Advice, Option<String>) {
-        let hay = format!("{name} {command}").to_lowercase();
+        // Match the entry name and the program file name, not every folder in the command
+        // line ("teams" must not match "C:\\Work\\teams-notes\\tool.exe").
+        let exe = command
+            .trim()
+            .trim_start_matches('"')
+            .split(['"'])
+            .next()
+            .unwrap_or("")
+            .split(".exe")
+            .next()
+            .unwrap_or("")
+            .rsplit(['\\', '/'])
+            .next()
+            .unwrap_or("");
+        let hay = format!("{name} {exe}").to_lowercase();
         self.apps
             .iter()
             .find(|a| hay.contains(&a.pattern.to_lowercase()))

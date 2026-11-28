@@ -155,7 +155,7 @@
   {/if}
 {/if}
 
-<Modal open={target !== null} title={t("Move to Recycle Bin?", "Recycle Bin mein bhejein?")}>
+<Modal open={target !== null} onclose={() => (target = null)} title={t("Move to Recycle Bin?", "Recycle Bin mein bhejein?")}>
   {#if target}<p class="selectable path">{target.path}</p><p class="muted small" style="margin-top:8px">{t(`${bytes(target.bytes)}. You can restore it from the Recycle Bin.`, `${bytes(target.bytes)}. Recycle Bin se wapas la sakte hain.`)}</p>{/if}
   {#snippet footer()}<button class="btn" onclick={() => (target = null)}>{t("Cancel", "Ruko")}</button><button class="btn primary" onclick={recycle}>{t("Move", "Bhejo")}</button>{/snippet}
 </Modal>
@@ -170,7 +170,7 @@
   .seg { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--surface-3); }
   .seg button { border: 0; background: transparent; padding: 6px 16px; border-radius: 999px; cursor: pointer; font-weight: 560; color: var(--slate); display: inline-flex; gap: 6px; align-items: center; }
   .seg button.on { background: var(--surface); color: var(--teal-text); box-shadow: var(--shadow); }
-  .seg em { font-style: normal; font-size: 11px; background: var(--teal); color: #fff; border-radius: 999px; padding: 0 6px; }
+  .seg em { font-style: normal; font-size: 11px; background: var(--primary-bg); color: var(--on-primary); border-radius: 999px; padding: 0 6px; }
   .bar-row { display: flex; gap: 10px; margin-bottom: 14px; padding: 12px; align-items: center; flex-wrap: wrap; }
   .summary { display: grid; grid-template-columns: 200px 1fr; gap: 14px; margin-bottom: 14px; }
   .stat { display: flex; flex-direction: column; gap: 2px; }

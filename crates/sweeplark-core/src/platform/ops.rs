@@ -37,16 +37,51 @@ pub fn command(program: &str) -> Command {
     cmd
 }
 
-/// Run a Windows command without flashing a console window.
+/// Run a Windows command without flashing a console window. Gives up (and ends it) after
+/// 10 minutes, so a stuck tool can never hold the app forever.
 pub fn run(program: &str, args: &[&str]) -> Result<Output> {
+    run_timeout(program, args, std::time::Duration::from_secs(600))
+}
+
+pub fn run_timeout(program: &str, args: &[&str], limit: std::time::Duration) -> Result<Output> {
+    use std::io::Read;
+    use std::process::Stdio;
     let mut cmd = Command::new(system_exe(program));
-    cmd.args(args);
+    cmd.args(args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x0800_0000);
     }
-    cmd.output().map_err(|e| Error::Other(format!("could not run {program}: {e}")))
+    let mut child = cmd.spawn().map_err(|e| Error::Other(format!("could not run {program}: {e}")))?;
+    let (mut out, mut err) = (child.stdout.take(), child.stderr.take());
+    let t_out = std::thread::spawn(move || {
+        let mut b = Vec::new();
+        if let Some(o) = out.as_mut() {
+            let _ = o.read_to_end(&mut b);
+        }
+        b
+    });
+    let t_err = std::thread::spawn(move || {
+        let mut b = Vec::new();
+        if let Some(e) = err.as_mut() {
+            let _ = e.read_to_end(&mut b);
+        }
+        b
+    });
+    let started = std::time::Instant::now();
+    let status = loop {
+        if let Some(st) = child.try_wait().map_err(|e| Error::Other(e.to_string()))? {
+            break st;
+        }
+        if started.elapsed() > limit {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(Error::Other(format!("{program} did not finish in time")));
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    };
+    Ok(Output { status, stdout: t_out.join().unwrap_or_default(), stderr: t_err.join().unwrap_or_default() })
 }
 
 fn ok(out: Output, what: &str) -> Result<String> {
@@ -132,25 +167,45 @@ pub fn set_power_plan(guid: &str) -> Result<()> {
 
 /// Add Windows' hidden "Ultimate Performance" plan (once); returns its GUID.
 pub fn add_ultimate_plan() -> Result<String> {
-    if let Some(p) = power_plans().into_iter().find(|p| p.guid == ULTIMATE_BASE || p.name.to_lowercase().contains("ultimate")) {
+    if let Some(p) = power_plans().into_iter().find(is_ultimate) {
         return Ok(p.guid);
     }
-    let text = ok(run("powercfg", &["-duplicatescheme", "e9a42b02-d5df-448d-aa00-03f14749eb61"])?, "power plan")?;
-    text.split_whitespace()
+    let text = ok(run("powercfg", &["-duplicatescheme", ULTIMATE_BASE])?, "power plan")?;
+    let guid = text
+        .split_whitespace()
         .find(|w| w.len() == 36 && w.matches('-').count() == 4)
         .map(str::to_lowercase)
-        .ok_or_else(|| Error::Other("Ultimate Performance plan was not created".into()))
+        .ok_or_else(|| Error::Other("Ultimate Performance plan was not created".into()))?;
+    let reg = crate::platform::registry::system_registry();
+    let _ = reg.write_value(crate::platform::registry::Hive::CurrentUser, OWN_KEY, "UltimatePlan", &crate::platform::registry::RegValue::Sz(guid.clone()));
+    Ok(guid)
 }
 
 /// High performance plan GUID (built into Windows; hidden on some Modern Standby laptops).
 pub const HIGH_PERFORMANCE: &str = "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c";
 pub const ULTIMATE_BASE: &str = "e9a42b02-d5df-448d-aa00-03f14749eb61";
 
+const OWN_KEY: &str = r"Software\Sweeplark";
+
+/// GUID of the Ultimate Performance plan Sweeplark created (plan names are translated, so
+/// the name alone can't be trusted on non-English Windows).
+fn remembered_ultimate() -> Option<String> {
+    let reg = crate::platform::registry::system_registry();
+    reg.read_value(crate::platform::registry::Hive::CurrentUser, OWN_KEY, "UltimatePlan")
+        .ok()
+        .flatten()
+        .and_then(|v| v.as_string().map(str::to_lowercase))
+}
+
+pub fn is_ultimate(p: &PowerPlan) -> bool {
+    p.guid == ULTIMATE_BASE || remembered_ultimate().as_deref() == Some(p.guid.as_str()) || p.name.to_lowercase().contains("ultimate")
+}
+
 /// The fastest plan on this PC: Ultimate if present, else High performance (added back from
 /// Windows' template when the laptop hides it).
 pub fn fastest_plan() -> Result<PowerPlan> {
     let plans = power_plans();
-    if let Some(p) = plans.iter().find(|p| p.guid == ULTIMATE_BASE || p.name.to_lowercase().contains("ultimate")) {
+    if let Some(p) = plans.iter().find(|p| is_ultimate(p)) {
         return Ok(p.clone());
     }
     if let Some(p) = plans.iter().find(|p| p.guid == HIGH_PERFORMANCE) {

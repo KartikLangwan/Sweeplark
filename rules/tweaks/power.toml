@@ -37,6 +37,8 @@ name = "No network while asleep"
 description = "Stops Modern Standby from staying online and draining battery in the bag."
 category = "power"
 risk = "safe"
+note = "In sleep, mail and messages don't sync until you wake the PC."
+note_hi = "Sleep mein mail aur messages PC jagne tak sync nahi honge."
 conditions = ["laptop"]
 recommended = true
 [[tweak.registry]]

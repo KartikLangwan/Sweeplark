@@ -1,6 +1,24 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// Human readable size, e.g. `1.4 GB`.
+/// Does `text` (lower case) contain `word` starting at a word boundary? "ram" matches
+/// "ram full" but not "program". Words with non-ASCII letters (Hindi) match anywhere.
+pub fn has_word(text: &str, word: &str) -> bool {
+    if !word.is_ascii() {
+        return text.contains(word);
+    }
+    let mut from = 0;
+    while let Some(i) = text[from..].find(word) {
+        let start = from + i;
+        let before = text[..start].chars().next_back();
+        if before.is_none_or(|c| !c.is_alphanumeric()) {
+            return true;
+        }
+        from = start + word.len().max(1);
+    }
+    false
+}
+
 pub fn format_bytes(bytes: u64) -> String {
     const UNITS: [&str; 5] = ["B", "KB", "MB", "GB", "TB"];
     let mut value = bytes as f64;
@@ -41,6 +59,15 @@ pub fn age_hours(time: SystemTime, now: SystemTime) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn word_boundaries() {
+        assert!(has_word("meri ram full hai", "ram"));
+        assert!(!has_word("program slow", "ram"));
+        assert!(has_word("is it secure?", "secur"));
+        assert!(!has_word("restart karna", "start"));
+        assert!(has_word("मेरा पीसी धीमा", "धीम"));
+    }
 
     #[test]
     fn formats_sizes() {

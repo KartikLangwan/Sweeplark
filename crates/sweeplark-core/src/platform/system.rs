@@ -123,6 +123,12 @@ mod other {
         None
     }
     pub fn message_box(_title: &str, _text: &str) {}
+    pub fn visible_window_pids() -> std::collections::HashSet<u32> {
+        std::collections::HashSet::new()
+    }
+    pub fn process_alive(_pid: u32) -> bool {
+        false
+    }
     pub fn cpu_temp_sensor() -> Option<f32> {
         None
     }
@@ -254,9 +260,11 @@ mod win {
                 (&state as *const PROCESS_POWER_THROTTLING_STATE).cast(),
                 std::mem::size_of::<PROCESS_POWER_THROTTLING_STATE>() as u32,
             );
-            let r2 = SetPriorityClass(handle, if on { IDLE_PRIORITY_CLASS } else { NORMAL_PRIORITY_CLASS });
+            // Only touch the priority when throttling worked, so a failure never leaves a
+            // process at idle priority without a record to undo it.
+            let r = r1.and_then(|()| SetPriorityClass(handle, if on { IDLE_PRIORITY_CLASS } else { NORMAL_PRIORITY_CLASS }));
             let _ = CloseHandle(handle);
-            r1.and(r2).map_err(|e| crate::Error::Other(format!("could not change process {pid}: {e}")))
+            r.map_err(|e| crate::Error::Other(format!("could not change process {pid}: {e}")))
         }
     }
 
@@ -329,6 +337,70 @@ mod win {
         pid
     }
 
+    /// For a Store app the top-level window belongs to ApplicationFrameHost; the real app is
+    /// the process of a child window. Returns that process (or `pid` unchanged).
+    fn real_app_pid(hwnd: windows::Win32::Foundation::HWND, pid: u32) -> u32 {
+        use windows::Win32::Foundation::LPARAM;
+        use windows::core::BOOL;
+        use windows::Win32::UI::WindowsAndMessaging::EnumChildWindows;
+        if !process_name(pid).is_some_and(|n| n.eq_ignore_ascii_case("ApplicationFrameHost.exe")) {
+            return pid;
+        }
+        unsafe extern "system" fn find(child: windows::Win32::Foundation::HWND, data: LPARAM) -> BOOL {
+            let state = unsafe { &mut *(data.0 as *mut (u32, u32)) };
+            let p = pid_of(child);
+            if p != 0 && p != state.0 {
+                state.1 = p;
+                return BOOL(0);
+            }
+            BOOL(1)
+        }
+        let mut state: (u32, u32) = (pid, 0);
+        unsafe {
+            let _ = EnumChildWindows(Some(hwnd), Some(find), LPARAM(&mut state as *mut (u32, u32) as isize));
+        }
+        if state.1 != 0 { state.1 } else { pid }
+    }
+
+    /// Processes that own a visible, normal app window (used to tell a game left running in
+    /// the background from a background service).
+    pub fn visible_window_pids() -> std::collections::HashSet<u32> {
+        use windows::Win32::Foundation::LPARAM;
+        use windows::core::BOOL;
+        use windows::Win32::UI::WindowsAndMessaging::EnumWindows;
+        unsafe extern "system" fn add(hwnd: windows::Win32::Foundation::HWND, data: LPARAM) -> BOOL {
+            let set = unsafe { &mut *(data.0 as *mut std::collections::HashSet<u32>) };
+            if unsafe { windows::Win32::UI::WindowsAndMessaging::IsWindowVisible(hwnd).as_bool() } {
+                let p = pid_of(hwnd);
+                if p != 0 {
+                    set.insert(real_app_pid(hwnd, p));
+                }
+            }
+            BOOL(1)
+        }
+        let mut set = std::collections::HashSet::new();
+        unsafe {
+            let _ = EnumWindows(Some(add), LPARAM(&mut set as *mut _ as isize));
+        }
+        set
+    }
+
+    /// Is the process still running? (An elevated game we may not query still counts as running.)
+    pub fn process_alive(pid: u32) -> bool {
+        use windows::Win32::Foundation::{ERROR_ACCESS_DENIED, WAIT_TIMEOUT};
+        use windows::Win32::System::Threading::{OpenProcess, PROCESS_SYNCHRONIZE, WaitForSingleObject};
+        unsafe {
+            match OpenProcess(PROCESS_SYNCHRONIZE, false, pid) {
+                Ok(h) => {
+                    let alive = WaitForSingleObject(h, 0) == WAIT_TIMEOUT;
+                    let _ = CloseHandle(h);
+                    alive
+                }
+                Err(e) => e.code() == ERROR_ACCESS_DENIED.to_hresult(),
+            }
+        }
+    }
+
     /// The app the user was using: the window in front, or, when Sweeplark itself is in
     /// front (the user just clicked Boost), the next real app window behind it.
     pub fn window_behind_own() -> Option<u32> {
@@ -343,7 +415,7 @@ mod win {
                     let name = process_name(pid).unwrap_or_default().to_lowercase();
                     // The desktop and taskbar are not "the app you are using".
                     if !matches!(name.as_str(), "explorer.exe" | "shellexperiencehost.exe" | "searchhost.exe" | "startmenuexperiencehost.exe" | "textinputhost.exe") {
-                        return Some(pid);
+                        return Some(real_app_pid(hwnd, pid));
                     }
                 }
                 hwnd = GetWindow(hwnd, GW_HWNDNEXT).unwrap_or_default();
@@ -378,7 +450,7 @@ mod win {
             let style = GetWindowLongW(hwnd, GWL_STYLE) as u32;
             let normal_window = (style & WS_CAPTION.0) == WS_CAPTION.0 || (style & WS_MAXIMIZE.0) != 0;
             let full = covers && !normal_window;
-            let pid = pid_of(hwnd);
+            let pid = real_app_pid(hwnd, pid_of(hwnd));
             if !full || pid == 0 || pid == std::process::id() {
                 return None;
             }
@@ -476,9 +548,11 @@ mod win {
             let ok = GetTokenInformation(token, TokenUser, Some(buf.as_mut_ptr().cast()), len, &mut len);
             let _ = CloseHandle(token);
             ok.ok()?;
-            let user = &*(buf.as_ptr() as *const TOKEN_USER);
+            // The byte buffer may not be aligned for TOKEN_USER: copy it out.
+            let user = std::ptr::read_unaligned(buf.as_ptr() as *const TOKEN_USER);
             let mut sid_str = PWSTR::null();
             ConvertSidToStringSidW(user.User.Sid, &mut sid_str).ok()?;
+            drop(buf);
             let s = sid_str.to_string().ok();
             let _ = LocalFree(Some(HLOCAL(sid_str.0.cast())));
             s

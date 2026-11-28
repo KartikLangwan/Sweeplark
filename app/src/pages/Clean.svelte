@@ -92,7 +92,7 @@
     <p class="muted">{t("Temp files, caches, logs and leftovers. Look first, then choose.", "Temp files, cache, logs aur purana kachra. Pehle dekhiye, phir chuniye.")}</p>
   </div>
   <button class="btn primary big" onclick={scan} disabled={scanning || cleaning}>
-    {#if scanning}<div class="spin" style="border-top-color:#fff"></div>{t("Scanning…", "Scan ho raha hai…")}{:else}<Icon name="broom" />{report ? t("Scan again", "Dobara scan") : t("Scan", "Scan karein")}{/if}
+    {#if scanning}<div class="spin" style="border-top-color:var(--on-primary)"></div>{t("Scanning…", "Scan ho raha hai…")}{:else}<Icon name="broom" />{report ? t("Scan again", "Dobara scan") : t("Scan", "Scan karein")}{/if}
   </button>
 </header>
 
@@ -148,7 +148,7 @@
     <span class="spacer"></span>
     <span class="muted small">{t(`Scanned in ${(report.duration_ms / 1000).toFixed(1)}s`, `Scan ${(report.duration_ms / 1000).toFixed(1)}s mein`)}</span>
     <button class="btn primary" onclick={start} disabled={!chosen.length || cleaning}>
-      {#if cleaning}<div class="spin" style="border-top-color:#fff"></div>{:else}<Icon name="broom" size={18} />{/if}{t("Clean now", "Saaf karein")}
+      {#if cleaning}<div class="spin" style="border-top-color:var(--on-primary)"></div>{:else}<Icon name="broom" size={18} />{/if}{t("Clean now", "Saaf karein")}
     </button>
   </div>
 

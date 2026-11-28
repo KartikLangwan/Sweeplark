@@ -7,14 +7,16 @@
   import { bytes } from "../lib/format";
   import { results, runJob, running } from "../lib/jobs.svelte";
   import { t, toast } from "../lib/state.svelte";
-  import type { InstalledApp } from "../lib/types";
+  import type { InstalledApp, Leftover } from "../lib/types";
 
   let tab = $state<"installed" | "updates">("installed");
   let query = $state("");
   let sort = $state<"name" | "size">("size");
   let target = $state<InstalledApp | null>(null);
   let waiting = $state<InstalledApp | null>(null);
-  let leftovers = $state<string[] | null>(null);
+  let leftovers = $state<Leftover[] | null>(null);
+  let removingLeft = $state(false);
+  let updatingAll = $state(false);
   let pickedLeft = $state<Record<string, boolean>>({});
 
   const apps = $derived(results.apps);
@@ -52,20 +54,27 @@
   async function findLeftovers() {
     try {
       leftovers = await api.leftovers();
-      pickedLeft = Object.fromEntries(leftovers.map((p) => [p, true]));
+      // Big folders (often game libraries or shared data) are not ticked by default.
+      pickedLeft = Object.fromEntries(leftovers.map((l) => [l.path, l.bytes < 1024 ** 3 && !l.partial]));
       await load();
     } catch (e) { toast(String(e), "warn"); }
   }
   async function removeLeftovers() {
-    let ok = 0;
-    for (const p of (leftovers ?? []).filter((p) => pickedLeft[p])) {
-      try { await api.recycle(p); ok++; } catch (e) { toast(String(e), "warn"); }
-    }
-    toast(t(`${ok} leftover folders moved to the Recycle Bin`, `${ok} bache folders Recycle Bin mein bheje`));
-    leftovers = null;
-    waiting = null;
+    if (removingLeft) return;
+    removingLeft = true;
+    const paths = (leftovers ?? []).filter((l) => pickedLeft[l.path]).map((l) => l.path);
+    try {
+      const n = await api.removeLeftovers(paths);
+      toast(t(`${n} leftover folders moved to the Recycle Bin`, `${n} bache folders Recycle Bin mein bheje`));
+      leftovers = null;
+      waiting = null;
+    } catch (e) {
+      const msg = String(e);
+      toast(msg.includes("administrator") ? t("Folders in Program Files need administrator rights.", "Program Files ke folders ke liye admin chahiye.") : msg, "warn");
+    } finally { removingLeft = false; }
   }
   async function update(id: string | null) {
+    if (id === null) { if (updatingAll) return; updatingAll = true; setTimeout(() => (updatingAll = false), 5000); }
     try { await api.appUpdate(id); toast(t("Update started in a new window", "Update nayi window mein shuru hua"), "info"); }
     catch (e) { toast(String(e), "warn"); }
   }
@@ -113,7 +122,7 @@
   <div class="card bar-row">
     <span class="muted small grow">{t("Updates come from winget (Windows Package Manager). Each one opens in its own window so you can see it.", "Updates winget (Windows Package Manager) se aate hain. Har update apni window mein dikhta hai.")}</span>
     <button class="btn ghost small" onclick={checkUpdates} disabled={running("updates")}><Icon name="restart" size={14} />{t("Check again", "Dobara dekho")}</button>
-    {#if updates?.length}<button class="btn primary small" onclick={() => update(null)}><Icon name="download" size={14} />{t("Update all", "Sab update karo")}</button>{/if}
+    {#if updates?.length}<button class="btn primary small" disabled={updatingAll} onclick={() => update(null)}><Icon name="download" size={14} />{t("Update all", "Sab update karo")}</button>{/if}
   </div>
   {#if updates}
     <div class="card list">
@@ -126,19 +135,19 @@
   {/if}
 {/if}
 
-<Modal open={target !== null} title={t("Uninstall this app?", "Yeh app hatayein?")}>
+<Modal open={target !== null} onclose={() => (target = null)} title={t("Uninstall this app?", "Yeh app hatayein?")}>
   {#if target}<p><strong>{target.name}</strong></p>
     <p class="muted small" style="margin-top:6px">{t("Its own uninstaller opens; follow its steps. Afterwards Sweeplark can look for leftover folders.", "Iska apna uninstaller khulega; uske steps follow karein. Baad mein Sweeplark bache folders dhoondh sakta hai.")}</p>{/if}
   {#snippet footer()}<button class="btn" onclick={() => (target = null)}>{t("Cancel", "Ruko")}</button><button class="btn primary" onclick={uninstall}>{t("Open uninstaller", "Uninstaller kholo")}</button>{/snippet}
 </Modal>
 
-<Modal open={leftovers !== null} title={t("Leftover folders", "Bache hue folders")} wide>
+<Modal open={leftovers !== null} onclose={() => (leftovers = null)} title={t("Leftover folders", "Bache hue folders")} wide>
   {#if leftovers?.length}
     <p class="muted small" style="margin-bottom:8px">{t("Only folders named like the app. Untick anything you want to keep. They go to the Recycle Bin.", "Sirf app ke naam wale folders. Jo rakhna ho use untick karein. Ye Recycle Bin mein jayenge.")}</p>
-    {#each leftovers as p}<label class="frow"><input type="checkbox" bind:checked={pickedLeft[p]} /><span class="path selectable">{p}</span></label>{/each}
+    {#each leftovers as l}<label class="frow"><input type="checkbox" bind:checked={pickedLeft[l.path]} /><span class="path selectable grow">{l.path}</span><span class="num muted small">{bytes(l.bytes)}{l.partial ? "+" : ""}</span></label>{/each}
   {:else}<p>{t("Nothing left behind. Clean uninstall!", "Kuch nahi bacha. Saaf uninstall!")}</p>{/if}
   {#snippet footer()}<button class="btn" onclick={() => { leftovers = null; waiting = null; }}>{t("Close", "Band")}</button>
-    {#if leftovers?.length}<button class="btn primary" onclick={removeLeftovers}>{t("Move to Recycle Bin", "Recycle Bin mein bhejo")}</button>{/if}{/snippet}
+    {#if leftovers?.length}<button class="btn primary" disabled={removingLeft || !leftovers.some((l) => pickedLeft[l.path])} onclick={removeLeftovers}>{t("Move to Recycle Bin", "Recycle Bin mein bhejo")}</button>{/if}{/snippet}
 </Modal>
 
 <style>

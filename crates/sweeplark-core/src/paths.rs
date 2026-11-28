@@ -55,7 +55,7 @@ impl AppPaths {
 pub fn expand_vars(input: &str, lookup: &dyn Fn(&str) -> Option<String>) -> Option<String> {
     let mut out = String::with_capacity(input.len());
     let mut rest = input;
-    if let Some(stripped) = rest.strip_prefix('~') {
+    if let Some(stripped) = rest.strip_prefix('~').filter(|r| r.is_empty() || r.starts_with(['/', '\\'])) {
         out.push_str(&lookup("USERPROFILE").or_else(|| lookup("HOME"))?);
         rest = stripped;
     }

@@ -35,6 +35,10 @@ pub struct AiEngine {
     pub cancel: AtomicBool,
     /// Engine process id while one runs (0 = none), readable without the lock.
     running_pid: AtomicU32,
+    /// Tier loaded right now, readable without waiting for a running answer.
+    loaded_now: Mutex<Option<Tier>>,
+    /// A model/engine download is running.
+    pub installing: AtomicBool,
 }
 
 impl AiEngine {
@@ -46,6 +50,8 @@ impl AiEngine {
             progress: Mutex::new(None),
             cancel: AtomicBool::new(false),
             running_pid: AtomicU32::new(0),
+            loaded_now: Mutex::new(None),
+            installing: AtomicBool::new(false),
         }
     }
 
@@ -54,7 +60,14 @@ impl AiEngine {
     }
 
     pub fn loaded_tier(&self) -> Option<Tier> {
-        self.loaded.lock().ok().and_then(|l| l.as_ref().map(|l| l.tier))
+        self.loaded_now.lock().ok().and_then(|g| *g)
+    }
+
+    fn set_loaded(&self, tier: Option<Tier>, pid: u32) {
+        self.running_pid.store(pid, Ordering::Relaxed);
+        if let Ok(mut g) = self.loaded_now.lock() {
+            *g = tier;
+        }
     }
 
     pub fn is_loaded(&self) -> bool {
@@ -81,6 +94,7 @@ impl AiEngine {
         };
         if needs_start {
             *guard = None; // stop the old one first: never two models in RAM
+            self.set_loaded(None, 0);
             let (exe, gpu_build) = runtime::find_server(&self.paths, &self.catalog).ok_or("AI engine not installed")?;
             let opts = ServerOptions::for_model(&spec, gpu_build && s.ai.use_gpu);
             let model = self.paths.model_file(&spec);
@@ -92,7 +106,7 @@ impl AiEngine {
                 }
                 Err(e) => return Err(e.to_string()),
             };
-            self.running_pid.store(server.pid(), Ordering::Relaxed);
+            self.set_loaded(Some(spec.tier), server.pid());
             *guard = Some(Loaded { server, tier: spec.tier, last_used: Instant::now() });
         }
         let loaded = guard.as_mut().expect("just loaded");
@@ -108,14 +122,26 @@ impl AiEngine {
         match self.loaded.try_lock() {
             Ok(mut g) => {
                 *g = None;
-                self.running_pid.store(0, Ordering::Relaxed);
+                self.set_loaded(None, 0);
             }
             Err(_) => {
                 let pid = self.running_pid.swap(0, Ordering::Relaxed);
                 if pid != 0 {
                     sweeplark_core::platform::system::kill_pid(pid);
                 }
+                if let Ok(mut g) = self.loaded_now.lock() {
+                    *g = None;
+                }
             }
+        }
+    }
+
+    /// Unload only if nobody is using the model right now (background work never cuts
+    /// off an answer the user is waiting for; the idle janitor unloads it later).
+    pub fn unload_gentle(&self) {
+        if let Ok(mut g) = self.loaded.try_lock() {
+            *g = None;
+            self.set_loaded(None, 0);
         }
     }
 
@@ -125,7 +151,7 @@ impl AiEngine {
             && g.as_ref().is_some_and(|l| l.last_used.elapsed() >= idle)
         {
             *g = None;
-            self.running_pid.store(0, Ordering::Relaxed);
+            self.set_loaded(None, 0);
         }
     }
 

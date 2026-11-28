@@ -415,7 +415,16 @@ mod gpu {
                 unsafe {
                     PdhCollectQueryData(p.query);
                 }
-                s.usage = p.values(p.gpu_3d).map(|v| v.iter().sum::<f64>().min(100.0) as f32);
+                // Sum 3D use per graphics adapter (instance names carry "luid_..."), then take the
+                // busiest adapter: adding an integrated and a dedicated GPU together is meaningless.
+                s.usage = p.named(p.gpu_3d).map(|items| {
+                    let mut per: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
+                    for (name, v) in items {
+                        let luid = name.split("_phys").next().and_then(|a| a.split("luid_").nth(1)).unwrap_or("").to_string();
+                        *per.entry(luid).or_default() += v;
+                    }
+                    per.values().copied().fold(0.0, f64::max).min(100.0) as f32
+                });
                 s.vram_used = p.values(p.vram).map(|v| v.iter().sum::<f64>() as u64);
                 s.disk_read = p.values(p.disk_read).and_then(|v| v.first().copied()).map(|v| v as u64);
                 s.disk_write = p.values(p.disk_write).and_then(|v| v.first().copied()).map(|v| v as u64);

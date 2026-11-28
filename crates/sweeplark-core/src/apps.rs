@@ -100,41 +100,110 @@ pub fn uninstall(app: &InstalledApp) -> Result<()> {
     }
 }
 
-/// Folders an uninstalled app commonly leaves behind: its install folder and folders named
-/// exactly like the app (or its publisher) in AppData / ProgramData / Program Files.
-/// Only call this after the app is gone from the installed list. The user picks what goes,
-/// and it goes to the Recycle Bin.
-pub fn leftovers(app: &InstalledApp) -> Vec<String> {
+#[derive(Debug, Clone, Serialize, PartialEq)]
+pub struct Leftover {
+    pub path: String,
+    pub bytes: u64,
+    pub files: u64,
+    /// Sized only partly (very big folder).
+    pub partial: bool,
+}
+
+/// Folder names that are shared by many programs and must never be offered as "leftovers",
+/// even when an app happens to have the same name.
+const SHARED: &[&str] = &[
+    "microsoft", "google", "mozilla", "adobe", "intel", "nvidia", "amd", "common files", "windowsapps", "packages",
+    "windows", "windows defender", "windows nt", "programs", "temp", "crashdumps", "steam", "steamapps", "epic games",
+    "package cache", "installer", "users", "public", "default",
+];
+
+fn is_shared_name(p: &Path) -> bool {
+    p.file_name().map(|n| n.to_string_lossy().to_lowercase()).is_some_and(|n| SHARED.contains(&n.as_str()))
+}
+
+fn size_of(dir: &Path) -> (u64, u64, bool) {
+    let started = std::time::Instant::now();
+    let (mut bytes, mut files) = (0u64, 0u64);
+    for e in walkdir::WalkDir::new(dir).follow_links(false).into_iter().flatten() {
+        if started.elapsed() > std::time::Duration::from_secs(2) {
+            return (bytes, files, true);
+        }
+        if e.file_type().is_file() {
+            files += 1;
+            bytes += e.metadata().map(|m| m.len()).unwrap_or(0);
+        }
+    }
+    (bytes, files, false)
+}
+
+/// Folders an uninstalled app commonly leaves behind: its recorded install folder and folders
+/// named exactly like the app (or `<publisher>\<app>`) in AppData, ProgramData and Program
+/// Files. Never vendor folders shared by many programs (`AppData\Microsoft`, `Google` ...),
+/// never system or profile roots, never links. Only call this after the app is gone from the
+/// installed list. The user picks what goes, and it goes to the Recycle Bin.
+pub fn leftovers(app: &InstalledApp) -> Vec<Leftover> {
+    let roots: Vec<PathBuf> = ["APPDATA", "LOCALAPPDATA", "ProgramData", "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432"]
+        .iter()
+        .filter_map(std::env::var_os)
+        .map(PathBuf::from)
+        .collect();
+    let ok_folder = |p: &Path| -> bool {
+        let real_dir = std::fs::symlink_metadata(p).map(|m| m.is_dir() && !m.file_type().is_symlink()).unwrap_or(false);
+        // At least drive + two folders deep, not a known root, not a shared vendor folder.
+        let deep = p.components().filter(|c| matches!(c, std::path::Component::Normal(_))).count() >= 2;
+        let is_root = roots.iter().any(|r| r.as_path() == p) || directories::UserDirs::new().is_some_and(|u| u.home_dir() == p);
+        real_dir && deep && !is_root && !is_shared_name(p) && crate::safety::SafetyGuard::for_current_user(Vec::new()).check_base(p).is_ok()
+    };
     let mut found: Vec<PathBuf> = Vec::new();
-    if let Some(loc) = app.location.as_deref().map(|l| PathBuf::from(l.trim_matches('"')))
-        && loc.is_dir()
-        && crate::storage::recycle_refusal(&loc).is_none()
+    if let Some(loc) = app.location.as_deref().map(|l| PathBuf::from(l.trim().trim_matches('"').trim_end_matches('\\')))
+        && !loc.as_os_str().is_empty()
+        && ok_folder(&loc)
     {
         found.push(loc);
     }
     let clean = |s: &str| s.trim().trim_end_matches('.').to_string();
-    let mut names = vec![clean(&app.name)];
-    // "Foo 2.3 (64-bit)" -> also "Foo"
-    if let Some(first) = app.name.split([' ', '(']).next()
-        && first.len() >= 4
-    {
-        names.push(clean(first));
-    }
-    let publisher = app.publisher.as_deref().map(clean);
-    let roots: Vec<PathBuf> =
-        ["APPDATA", "LOCALAPPDATA", "ProgramData", "ProgramFiles", "ProgramFiles(x86)"].iter().filter_map(std::env::var_os).map(PathBuf::from).collect();
+    let name = clean(&app.name);
+    let publisher = app.publisher.as_deref().map(clean).filter(|p| !p.is_empty());
     for root in &roots {
-        let mut candidates: Vec<PathBuf> = names.iter().map(|n| root.join(n)).collect();
+        let mut candidates = vec![root.join(&name)];
         if let Some(p) = &publisher {
-            candidates.extend(names.iter().map(|n| root.join(p).join(n)));
+            candidates.push(root.join(p).join(&name));
         }
         for c in candidates {
-            if c.is_dir() && !found.contains(&c) {
+            if !found.contains(&c) && ok_folder(&c) {
                 found.push(c);
             }
         }
     }
-    found.into_iter().map(|p| p.display().to_string()).collect()
+    found
+        .into_iter()
+        .map(|p| {
+            let (bytes, files, partial) = size_of(&p);
+            Leftover { path: p.display().to_string(), bytes, files, partial }
+        })
+        .collect()
+}
+
+/// Send chosen leftovers of `app` to the Recycle Bin. Only paths that [`leftovers`] offers
+/// for this app are accepted. Returns how many folders went.
+pub fn remove_leftovers(app: &InstalledApp, paths: &[String]) -> Result<u32> {
+    let allowed: Vec<String> = leftovers(app).into_iter().map(|l| l.path).collect();
+    let mut n = 0;
+    for p in paths {
+        if !allowed.contains(p) {
+            return Err(Error::Unsafe { path: p.into(), reason: "not a leftover of this app".into() });
+        }
+        let path = Path::new(p);
+        if !crate::platform::system::has_recycle_bin(path) {
+            return Err(Error::Other(format!("{p}: no Recycle Bin on this drive")));
+        }
+        crate::platform::system::to_recycle_bin(path).map_err(|e| {
+            if e.to_string().to_lowercase().contains("denied") { Error::NeedsAdmin(p.clone()) } else { e }
+        })?;
+        crate::log::info(&format!("leftover moved to Recycle Bin: {p}"));
+        n += 1;
+    }
+    Ok(n)
 }
 
 /// Is this app still installed (its registry entry exists)?
@@ -192,13 +261,48 @@ fn valid_id(id: &str) -> bool {
 }
 
 /// Apps with a newer version in winget. Errors when winget is not installed.
+/// winget.exe from the App Installer (by full path, not whatever is on PATH).
+fn winget_exe() -> PathBuf {
+    std::env::var_os("LOCALAPPDATA")
+        .map(|l| PathBuf::from(l).join(r"Microsoft\WindowsApps\winget.exe"))
+        .filter(|p| p.exists())
+        .unwrap_or_else(|| PathBuf::from("winget"))
+}
+
+/// Apps with a newer version in winget. Errors when winget is not installed or hangs.
 pub fn updates() -> Result<Vec<AppUpdate>> {
-    let out = std::process::Command::new("winget")
-        .args(["upgrade", "--accept-source-agreements", "--disable-interactivity"])
+    use std::io::Read;
+    let mut cmd = std::process::Command::new(winget_exe());
+    cmd.args(["upgrade", "--accept-source-agreements", "--disable-interactivity"])
         .stdin(std::process::Stdio::null())
-        .output()
-        .map_err(|_| Error::NotFound("winget (App Installer from the Microsoft Store)".into()))?;
-    Ok(parse_winget(&String::from_utf8_lossy(&out.stdout)))
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000);
+    }
+    let mut child = cmd.spawn().map_err(|_| Error::NotFound("winget (App Installer from the Microsoft Store)".into()))?;
+    let mut stdout = child.stdout.take().ok_or_else(|| Error::Other("winget gave no output".into()))?;
+    let reader = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        let _ = stdout.read_to_end(&mut buf);
+        buf
+    });
+    let started = std::time::Instant::now();
+    loop {
+        if child.try_wait().ok().flatten().is_some() {
+            break;
+        }
+        if started.elapsed() > std::time::Duration::from_secs(120) {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(Error::Other("winget did not answer in 2 minutes".into()));
+        }
+        std::thread::sleep(std::time::Duration::from_millis(200));
+    }
+    let out = reader.join().unwrap_or_default();
+    Ok(parse_winget(&String::from_utf8_lossy(&out)))
 }
 
 /// Update one app (or all with `None`) in a visible window, so the user sees progress.
@@ -208,7 +312,7 @@ pub fn update(id: Option<&str>) -> Result<()> {
         Some(_) => return Err(Error::Other("bad app id".into())),
         None => "--all".into(),
     };
-    let line = format!("winget upgrade {target} --accept-source-agreements --accept-package-agreements & echo. & pause");
+    let line = format!("\"{}\" upgrade {target} --accept-source-agreements --accept-package-agreements & echo. & pause", winget_exe().display());
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -224,11 +328,6 @@ pub fn update(id: Option<&str>) -> Result<()> {
         let _ = line;
         Err(Error::NotSupported("winget".into()))
     }
-}
-
-/// Folder exists and may be removed (used before sending leftovers to the Recycle Bin).
-pub fn is_removable_leftover(path: &Path) -> bool {
-    path.is_dir() && crate::storage::recycle_refusal(path).is_none()
 }
 
 #[cfg(test)]
@@ -256,6 +355,31 @@ mod tests {
         assert!(!apps[0].for_all_users);
         assert_eq!(apps[1].size_bytes, Some(2048 * 1024));
         assert!(still_installed(&reg, &apps[1].id));
+    }
+
+    #[test]
+    fn leftovers_never_offer_shared_vendor_folders() {
+        let d = tempfile::tempdir().unwrap();
+        let root = d.path();
+        std::fs::create_dir_all(root.join("Microsoft/Protect")).unwrap();
+        std::fs::create_dir_all(root.join("Microsoft Teams")).unwrap();
+        // SAFETY of the test: only this process reads APPDATA here.
+        unsafe { std::env::set_var("APPDATA", root) };
+        let app = InstalledApp {
+            id: "x".into(),
+            name: "Microsoft Teams".into(),
+            publisher: Some("Microsoft".into()),
+            version: None,
+            size_bytes: None,
+            install_date: None,
+            location: None,
+            for_all_users: false,
+            uninstall: String::new(),
+        };
+        let found: Vec<String> = leftovers(&app).into_iter().map(|l| l.path).collect();
+        assert!(found.iter().any(|p| p.ends_with("Microsoft Teams")), "{found:?}");
+        assert!(!found.iter().any(|p| p.ends_with("Microsoft")), "{found:?}");
+        assert!(is_shared_name(Path::new("C:/x/Google")));
     }
 
     #[test]

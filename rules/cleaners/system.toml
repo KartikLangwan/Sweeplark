@@ -75,6 +75,8 @@ category = "logs"
 risk = "safe"
 [[cleaner.target]]
 path = "%LOCALAPPDATA%/Microsoft/Windows/WER"
+exclude = ["ReportQueue/**"]
+min_age_hours = 24
 remove_empty_dirs = true
 
 [[cleaner]]

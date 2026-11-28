@@ -1,22 +1,42 @@
 //! Game mode: when a full-screen app is in front (a game), heavy background apps are put in
-//! Efficiency mode, and put back when the game closes. Off by default (Settings > Boost).
+//! Efficiency mode, and put back when the game closes. RAM guard: frees RAM from background
+//! apps when memory stays nearly full. Both are off by default (Boost page / Settings).
 
 use std::time::Duration;
 
 use sweeplark_core::boost::{self, BoostOptions};
 use sweeplark_core::ledger::{ChangeStatus, NewChange};
+use sweeplark_core::revert::RevertStep;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_notification::NotificationExt;
 
 use crate::AppState;
 
+struct ActiveGame {
+    pid: u32,
+    /// Program name, so a reused process id is not mistaken for the game.
+    name: String,
+    /// What to put back, kept here (not only in History) so it works even if the database
+    /// could not record it.
+    revert: Vec<RevertStep>,
+    ledger_id: Option<i64>,
+}
+
 #[derive(Default)]
 pub struct GameState {
-    /// Game process and the ledger entry that puts the calmed apps back (None = nothing calmed).
-    active: Option<(u32, Option<i64>)>,
+    active: Option<ActiveGame>,
     /// RAM guard: checks in a row above the limit, and when it last acted.
     high_ram: u32,
     last_guard: Option<std::time::Instant>,
+}
+
+fn game_still_running(g: &ActiveGame) -> bool {
+    use sweeplark_core::platform::system;
+    if !system::process_alive(g.pid) {
+        return false;
+    }
+    // Can't read the name (elevated game): trust "alive". Different name: the id was reused.
+    system::process_name(g.pid).is_none_or(|n| n.eq_ignore_ascii_case(&g.name))
 }
 
 /// RAM guard: RAM above the limit for 4 checks (~1 minute) frees RAM from background apps.
@@ -29,7 +49,7 @@ fn ram_guard(app: &AppHandle) {
     if !on {
         return;
     }
-    let Ok(mut m) = state.monitor.lock() else { return };
+    let Ok(mut m) = state.boost_monitor.lock() else { return };
     let st = m.sample();
     let pct = st.ram_used as f64 / st.ram_total.max(1) as f64 * 100.0;
     let Ok(mut g) = state.game.lock() else { return };
@@ -54,54 +74,63 @@ fn ram_guard(app: &AppHandle) {
     }
 }
 
+fn restore(app: &AppHandle, g: ActiveGame) {
+    let state = app.state::<AppState>();
+    let reg = sweeplark_core::platform::registry::system_registry();
+    let _ = sweeplark_core::revert::apply_all(&g.revert, reg.as_ref());
+    // Mark it done in History too (putting back twice is harmless).
+    if let (Some(id), Ok(l)) = (g.ledger_id, state.ledger.lock()) {
+        let _ = l.undo(id, reg.as_ref());
+    }
+    sweeplark_core::log::info(&format!("game mode: {} closed, apps restored", g.name));
+}
+
 fn check(app: &AppHandle) {
     let state = app.state::<AppState>();
     let (enabled, never, lang) = match state.settings.lock() {
         Ok(s) => (s.boost.auto_game, s.boost.never.clone(), s.language),
         Err(_) => return,
     };
-    let active = state.game.lock().ok().and_then(|g| g.active);
     // Game closed (or game mode switched off): put everything back.
-    if let Some((pid, ledger_id)) = active {
-        let gone = sweeplark_core::platform::system::process_name(pid).is_none();
-        if gone || !enabled {
-            if let (Some(id), Ok(l)) = (ledger_id, state.ledger.lock()) {
-                let _ = l.undo(id, sweeplark_core::platform::registry::system_registry().as_ref());
-            }
-            if let Ok(mut g) = state.game.lock() {
-                g.active = None;
-            }
-            sweeplark_core::log::info("game mode: game closed, apps restored");
-        }
+    let finished = state.game.lock().ok().and_then(|mut g| {
+        let done = g.active.as_ref().is_some_and(|a| !enabled || !game_still_running(a));
+        if done { g.active.take() } else { None }
+    });
+    if let Some(g) = finished {
+        restore(app, g);
         return;
     }
-    if !enabled {
+    if !enabled || state.game.lock().map(|g| g.active.is_some()).unwrap_or(true) {
         return;
     }
     let Some(pid) = sweeplark_core::platform::system::fullscreen_foreground() else { return };
+    let game = sweeplark_core::platform::system::process_name(pid).unwrap_or_else(|| "game".into());
     let opts = BoostOptions { eco_cpu: true, eco_gpu: true, ..Default::default() };
-    let report = match state.monitor.lock() {
+    let report = match state.boost_monitor.lock() {
         Ok(mut m) => boost::apply(&mut m, &opts, &never, Some(pid)),
         Err(_) => return,
     };
-    let steps = report.revert_steps();
-    let game = sweeplark_core::platform::system::process_name(pid).unwrap_or_else(|| "game".into());
-    let id = if steps.is_empty() { None } else { state.ledger.lock().ok().and_then(|l| {
-        l.record(&NewChange {
-            category: "boost".into(),
-            title: lang.pick("Game mode", "Game mode").to_string() + &format!(": {game} ({} apps calmed)", report.eco.len()),
-            risk: sweeplark_core::Risk::Safe,
-            status: ChangeStatus::Applied,
-            bytes_freed: 0,
-            items: report.eco.len() as u64,
-            details: serde_json::to_value(&report).unwrap_or_default(),
-            revert: steps.clone(),
+    let revert = report.revert_steps();
+    let ledger_id = if revert.is_empty() {
+        None
+    } else {
+        state.ledger.lock().ok().and_then(|l| {
+            l.record(&NewChange {
+                category: "boost".into(),
+                title: format!("{}: {game} ({} apps calmed)", lang.pick("Game mode", "Game mode"), report.eco.len()),
+                risk: sweeplark_core::Risk::Safe,
+                status: ChangeStatus::Applied,
+                bytes_freed: 0,
+                items: report.eco.len() as u64,
+                details: serde_json::to_value(&report).unwrap_or_default(),
+                revert: revert.clone(),
+            })
+            .ok()
         })
-        .ok()
-    }) };
+    };
     // Even with nothing calmed, remember the game so it is not checked again and again.
     if let Ok(mut g) = state.game.lock() {
-        g.active = Some((pid, id));
+        g.active = Some(ActiveGame { pid, name: game.clone(), revert, ledger_id });
     }
     if !report.eco.is_empty() {
         let body = match lang {

@@ -14,6 +14,14 @@ use tauri::{AppHandle, Manager};
 use crate::{AppState, show_main};
 
 static ATTENTION: AtomicBool = AtomicBool::new(false);
+static AUTOSTART_ITEM: std::sync::OnceLock<CheckMenuItem<tauri::Wry>> = std::sync::OnceLock::new();
+
+/// Keep the tray's "Start with Windows" tick in step with the setting.
+pub fn set_autostart_check(on: bool) {
+    if let Some(item) = AUTOSTART_ITEM.get() {
+        let _ = item.set_checked(on);
+    }
+}
 static LAST_HOVER: AtomicU64 = AtomicU64::new(0);
 static BUSY: AtomicBool = AtomicBool::new(false);
 
@@ -29,6 +37,8 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
     let l = lang(app);
     let item = |id: &str, en: &str, hi: &str| MenuItem::with_id(app, id, l.pick(en, hi), true, None::<&str>);
     let autostart_on = app.state::<AppState>().settings.lock().map(|s| s.agent.start_with_windows).unwrap_or(true);
+    let autostart = CheckMenuItem::with_id(app, "autostart", l.pick("Start with Windows", "Windows ke saath chalu"), true, autostart_on, None::<&str>)?;
+    let _ = AUTOSTART_ITEM.set(autostart.clone());
     let menu = Menu::with_items(
         app,
         &[
@@ -44,7 +54,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
             &item("inbox", "Messages", "Messages")?,
             &item("settings", "Settings", "Settings")?,
             &PredefinedMenuItem::separator(app)?,
-            &CheckMenuItem::with_id(app, "autostart", l.pick("Start with Windows", "Windows ke saath chalu"), true, autostart_on, None::<&str>)?,
+            &autostart,
             &PredefinedMenuItem::separator(app)?,
             &item("quit", "Quit", "Band karein")?,
         ],
@@ -58,13 +68,8 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
             "open" => show_main(app, None),
             "quit" => crate::quit(app),
             "autostart" => {
-                let state = app.state::<AppState>();
-                if let Ok(mut s) = state.settings.lock() {
-                    s.agent.start_with_windows = !s.agent.start_with_windows;
-                    let _ = s.save(&state.paths.settings_file());
-                }
+                crate::commands::update_settings(app, |s| s.agent.start_with_windows = !s.agent.start_with_windows);
                 crate::commands::apply_autostart(app);
-                crate::settings_changed(app);
             }
             page => show_main(app, Some(page)),
         })
@@ -124,8 +129,8 @@ fn update_tooltip(app: &AppHandle) {
     {
         lines.push(format!("{} {:.0} GB {}", sys_mount.trim_end_matches('\\').to_uppercase(), d.available_space() as f64 / gb, l.pick("free", "khaali")));
     }
-    let mut text = lines.join("\n");
-    text.truncate(127);
+    // Windows allows 127 characters; cut on a character, never inside one (° and · are 2 bytes).
+    let text: String = lines.join("\n").chars().take(127).collect();
     if let Some(tray) = app.tray_by_id("main") {
         let _ = tray.set_tooltip(Some(text));
     }

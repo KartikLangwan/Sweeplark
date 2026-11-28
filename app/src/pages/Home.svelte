@@ -68,6 +68,7 @@
     const r = await runJob("optimize", t("Cleaning safe items", "Safe safai ho rahi hai"), "home", () => api.optimizeApply());
     if (!r) { results.homePhase = "planned"; return; }
     results.optimized = r;
+    results.plan = null; // cleaned: its junk numbers no longer apply
     results.homePhase = "done";
     toast(t(`Freed ${bytes(r.clean.freed_bytes)}`, `${bytes(r.clean.freed_bytes)} jagah khaali hui`));
     api.health(false).then((h) => (health = { ...h, security: health?.security ?? null, battery: health?.battery ?? null }));
@@ -182,6 +183,8 @@
       {#if latest.ai_body}<p class="ai selectable">{latest.ai_body}</p>{/if}
       <pre class="selectable">{latest.body}</pre>
       <button class="btn small" onclick={() => go("inbox")}>{t("All messages", "Saare messages")}</button>
+    {:else if !ui.settings?.agent.daily_summary}
+      <p class="muted">{t("Daily reports are off. Turn them on in Settings > Automation.", "Daily report band hai. Settings > Automatic kaam mein chalu karein.")}</p>
     {:else}
       <p class="muted">{t(`Every evening at ${ui.settings?.agent.daily_summary ?? "21:00"} Sweeplark sends a short report: space freed, when RAM was full, and the heaviest app.`, `Har shaam ${ui.settings?.agent.daily_summary ?? "21:00"} baje Sweeplark aapko din ki chhoti si report dega: kitni jagah bachi, RAM kab bhari, kaun si app sabse bhari rahi.`)}</p>
     {/if}

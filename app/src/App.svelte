@@ -138,7 +138,7 @@
   .nav-item { border: 1px solid transparent; }
   .nav-item.active { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: var(--shadow); border: 1px solid var(--line); }
   .nav-item.active :global(svg) { color: var(--teal); }
-  .nav-item em { margin-left: auto; font-style: normal; font-size: 11px; font-weight: 700; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; display: grid; place-items: center; background: var(--teal); color: #fff; }
+  .nav-item em { margin-left: auto; font-style: normal; font-size: 11px; font-weight: 700; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; display: grid; place-items: center; background: var(--primary-bg); color: var(--on-primary); }
   .nav-item em.amber { background: var(--amber); color: #3a2500; }
   .foot { margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding: 0 6px; }
   .local { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--slate); padding: 4px 6px; }

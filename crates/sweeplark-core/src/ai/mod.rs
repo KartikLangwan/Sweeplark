@@ -182,7 +182,8 @@ pub fn narrate(client: &LlamaClient, kind: &str, points: &[String], facts: &str,
         ChatMessage::user(format!("Write the {kind} now.")),
     ];
     let raw = client.chat(&msgs, &Sampling { max_tokens: 120, temperature: 0.3 }).ok()?;
-    guard::check(&raw, &format!("{facts}\n{}", points.join("\n")))
+    // Same strict check as chat: a report must never claim "I closed Chrome".
+    guard::check_chat(&raw, &format!("{facts}\n{}", points.join("\n")))
 }
 
 #[cfg(test)]

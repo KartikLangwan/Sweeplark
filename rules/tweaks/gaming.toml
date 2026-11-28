@@ -25,6 +25,8 @@ name = "Turn off Game Bar recording"
 description = "Stops background game recording (Game DVR), which costs FPS."
 category = "gaming"
 risk = "safe"
+note = "Game Bar can no longer record clips in the background."
+note_hi = "Game Bar background mein clips record nahi kar payega."
 recommended = true
 [[tweak.registry]]
 key = 'HKCU\Software\Microsoft\Windows\CurrentVersion\GameDVR'
@@ -129,6 +131,7 @@ setting = true
 [[tweak.registry]]
 key = 'HKCU\Software\Microsoft\DirectX\UserGpuPreferences'
 name = "DirectXUserGlobalSettings"
+kind = "flags"
 value = "SwapEffectUpgradeEnable=1;"
 off = "SwapEffectUpgradeEnable=0;"
 

@@ -174,6 +174,8 @@ name = "Stop sending typing and inking data"
 description = "Windows stops collecting what you type and write to 'improve' recognition."
 category = "privacy"
 risk = "safe"
+note = "Websites no longer see your language list (pages may pick the language by region)."
+note_hi = "Websites aapki language list nahi dekhengi (page region se language chun sakta hai)."
 recommended = true
 [[tweak.registry]]
 key = 'HKCU\SOFTWARE\Microsoft\InputPersonalization'
@@ -314,6 +316,8 @@ name = "Don't share updates with other PCs"
 description = "Windows Update downloads only from Microsoft, not from or to other PCs on the internet."
 category = "privacy"
 risk = "safe"
+note = "Windows updates come only from Microsoft, not from other PCs; can be slower."
+note_hi = "Windows updates sirf Microsoft se aayenge, doosre PCs se nahi; thode dheeme ho sakte hain."
 recommended = true
 [[tweak.registry]]
 key = 'HKLM\SOFTWARE\Policies\Microsoft\Windows\DeliveryOptimization'
@@ -377,6 +381,8 @@ name = "Turn off online speech recognition"
 description = "Your voice is not sent to Microsoft for recognition."
 category = "privacy"
 risk = "safe"
+note = "Online dictation (Win+H) and Voice access stop working."
+note_hi = "Online dictation (Win+H) aur Voice access kaam nahi karenge."
 recommended = true
 [[tweak.registry]]
 key = 'HKCU\SOFTWARE\Microsoft\Speech_OneCore\Settings\OnlineSpeechPrivacy'

@@ -115,7 +115,7 @@ pub fn run(
                     id: c.id.clone(),
                     name: c.name.clone(),
                     bytes: safe_part,
-                    files: c.files - c.flagged.len() as u64,
+                    files: c.files - c.flagged_count(),
                     risk: c.risk,
                     note: c.note.clone(),
                 });

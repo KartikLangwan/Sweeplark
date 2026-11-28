@@ -29,6 +29,9 @@ pub struct Settings {
     pub boost: BoostSettings,
     /// Create a Windows restore point before Optimizer changes that need administrator.
     pub restore_point_before_tweaks: bool,
+    /// Goes up on every save. A save based on an older copy is refused, so a change made
+    /// meanwhile (tray, AI download) is never overwritten silently.
+    pub rev: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -181,6 +184,7 @@ impl Default for Settings {
             skipped_version: None,
             boost: BoostSettings::default(),
             restore_point_before_tweaks: true,
+            rev: 0,
         }
     }
 }
@@ -199,6 +203,26 @@ impl Settings {
         let Ok(text) = std::fs::read_to_string(path) else { return defaults() };
         match serde_json::from_str::<Settings>(&text) {
             Ok(s) => s.sanitized(),
+            // Readable JSON with one bad value (e.g. from a newer version): keep every part
+            // that still reads, so the whitelist is never dropped because of one field.
+            Err(e) if serde_json::from_str::<serde_json::Value>(&text).is_ok_and(|v| v.is_object()) => {
+                let v: serde_json::Value = serde_json::from_str(&text).unwrap_or_default();
+                let mut base = serde_json::to_value(defaults()).unwrap_or_default();
+                if let (Some(obj), Some(b)) = (v.as_object(), base.as_object_mut()) {
+                    for (k, val) in obj {
+                        let mut trial = b.clone();
+                        trial.insert(k.clone(), val.clone());
+                        if serde_json::from_value::<Settings>(serde_json::Value::Object(trial)).is_ok() {
+                            b.insert(k.clone(), val.clone());
+                        } else {
+                            crate::log::warn(&format!("settings: ignored unreadable \"{k}\" ({e})"));
+                        }
+                    }
+                }
+                let backup = path.with_extension(format!("broken-{}.json", chrono::Utc::now().format("%Y%m%d-%H%M%S")));
+                let _ = std::fs::copy(path, &backup);
+                serde_json::from_value::<Settings>(base).map(Settings::sanitized).unwrap_or_else(|_| defaults())
+            }
             Err(e) => {
                 // Keep the broken file so the whitelist and choices are not lost for good.
                 let backup = path.with_extension(format!("broken-{}.json", chrono::Utc::now().format("%Y%m%d-%H%M%S")));
@@ -220,6 +244,22 @@ impl Settings {
         }
         self.recycle_bin_min_age_days = self.recycle_bin_min_age_days.min(3650);
         self.ai.unload_after_secs = self.ai.unload_after_secs.clamp(30, 3600);
+        // Times must be "HH:MM"; anything else would silently switch a feature off.
+        let fix = |t: &mut String, default: &str| {
+            if crate::agent::schedule::parse_hm(t).is_none() {
+                crate::log::warn(&format!("settings: bad time \"{t}\", using {default}"));
+                *t = default.into();
+            }
+        };
+        fix(&mut self.agent.auto_clean.time, "13:00");
+        fix(&mut self.agent.notify.quiet_from, "22:30");
+        fix(&mut self.agent.notify.quiet_to, "08:00");
+        if let Some(w) = self.agent.weekly_summary.as_mut() {
+            fix(&mut w.time, "20:00");
+        }
+        if let Some(d) = self.agent.daily_summary.as_mut() {
+            fix(d, "21:00");
+        }
         self.whitelist.retain(|p| !p.as_os_str().is_empty());
         self.boost.never.retain(|n| !n.trim().is_empty());
         self.boost.ram_guard_percent = self.boost.ram_guard_percent.clamp(70, 97);
@@ -231,7 +271,13 @@ impl Settings {
             std::fs::create_dir_all(parent)?;
         }
         let tmp = path.with_extension("json.tmp");
-        std::fs::write(&tmp, serde_json::to_vec_pretty(self)?)?;
+        {
+            use std::io::Write;
+            let mut f = std::fs::File::create(&tmp)?;
+            f.write_all(&serde_json::to_vec_pretty(self)?)?;
+            // On disk before the rename, so a power cut can't leave an empty settings file.
+            f.sync_all()?;
+        }
         std::fs::rename(tmp, path)?;
         Ok(())
     }
@@ -261,5 +307,11 @@ mod tests {
         let fixed = odd.sanitized();
         assert_eq!(fixed.agent.sample_minutes, 1);
         assert_eq!(fixed.boost.ram_guard_percent, 70);
+        // One unknown value (from a newer version) keeps the rest, whitelist included.
+        std::fs::write(&p, r#"{"whitelist":["C:\\keep"],"language":"klingon","recycle_bin_min_age_days":30}"#).unwrap();
+        let partly = Settings::load(&p);
+        assert_eq!(partly.whitelist, vec![std::path::PathBuf::from("C:\\keep")]);
+        assert_eq!(partly.recycle_bin_min_age_days, 30);
+        assert_eq!(partly.language, Lang::En);
     }
 }

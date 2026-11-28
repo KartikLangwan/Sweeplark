@@ -29,23 +29,38 @@ export function go(page: Page) {
   ui.page = page;
 }
 
+let inboxLoaded = false;
 export async function refreshInbox() {
   const box = await api.inbox();
-  const newApproval = box.pending_approvals > ui.pendingApprovals;
+  // Chime only for a request that arrives while the app is open, not for old ones at start.
+  const newApproval = inboxLoaded && box.pending_approvals > ui.pendingApprovals;
+  inboxLoaded = true;
   ui.unread = box.unread;
   ui.pendingApprovals = box.pending_approvals;
   if (newApproval) chime();
   return box;
 }
 
-export async function saveSettings(s: Settings) {
-  await api.saveSettings(s);
-  ui.settings = s;
+/** Save settings. If they were changed elsewhere meanwhile (tray, AI download), the fresh
+ *  copy is loaded instead and the caller gets an error to show. */
+export async function saveSettings(s: Settings): Promise<Settings> {
+  try {
+    const saved = await api.saveSettings(s);
+    ui.settings = saved;
+    return saved;
+  } catch (e) {
+    if (String(e).includes("settings_changed")) {
+      ui.settings = await api.settings();
+      throw new Error(t("Settings were changed elsewhere and have been reloaded. Please try again.", "Settings kahin aur badli gayi thi, dobara load ki. Phir se try karein."));
+    }
+    throw e;
+  }
 }
 
 /** Soft two-note chime (generated, no audio file) for approval requests. */
 export function chime() {
-  if (ui.settings && !ui.settings.agent.notify.sound) return;
+  const n = ui.settings?.agent.notify;
+  if (!n || !n.enabled || !n.sound) return;
   try {
     const ctx = new AudioContext();
     const notes = [880, 1318.5];

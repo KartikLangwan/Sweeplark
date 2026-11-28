@@ -18,7 +18,9 @@
   let data = $state<History | null>(null);
   let filter = $state<Filter>("all");
   onMount(load);
-  async function load() { data = await api.history(200); }
+  async function load() {
+    try { data = await api.history(200); } catch (e) { toast(String(e), "warn"); }
+  }
 
   async function undo(id: number) {
     try {
@@ -38,6 +40,7 @@
     return "history";
   }
   function filterOf(c: string): Filter | "other" {
+    if (c === "tweak" || c === "tweak.off") return "optimize";
     if (c === "clean" || c === "optimize" || c === "startup" || c === "boost") return c;
     return "other";
   }
@@ -96,7 +99,7 @@
             <span class="ic"><Icon name={iconFor(r.category)} size={17} /></span>
             <div class="col grow" style="gap:2px">
               <strong>{r.title}</strong>
-              <span class="muted small">{ago(r.at)} · #{r.id}{r.status === "reverted" ? t(" · undone", " · wapas liya gaya") : ""}{r.category === "clean" ? t(" · deleted cache can't be restored", " · cache wapas nahi aata") : ""}</span>
+              <span class="muted small">{ago(r.at)} · #{r.id}{r.status === "reverted" ? t(" · undone", " · wapas liya gaya") : ""}{r.category === "clean" ? t(" · junk files don't come back (ticked files of yours went to the Recycle Bin)", " · kachra wapas nahi aata (aapki tick ki files Recycle Bin mein hain)") : ""}</span>
             </div>
             {#if r.bytes_freed}<span class="num freed">{bytes(r.bytes_freed)}</span>{/if}
             {#if r.can_undo}<button class="btn small" onclick={() => undo(r.id)}><Icon name="undo" size={15} />{t("Undo", "Undo")}</button>{/if}

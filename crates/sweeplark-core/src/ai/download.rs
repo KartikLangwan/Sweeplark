@@ -59,6 +59,15 @@ pub fn download(url: &str, dest: &Path, expected_size: Option<u64>, sha256: &str
         fs::remove_file(&part)?;
         have = 0;
     }
+    // Already complete (cancelled right at the end): check it instead of asking for 0 bytes.
+    if have > 0 && expected_size == Some(have) {
+        if sha256_file(&part)?.eq_ignore_ascii_case(sha256) {
+            fs::rename(&part, dest)?;
+            return Ok(());
+        }
+        fs::remove_file(&part)?;
+        have = 0;
+    }
 
     let agent = web_agent();
     let mut req = agent.get(url);
@@ -67,6 +76,11 @@ pub fn download(url: &str, dest: &Path, expected_size: Option<u64>, sha256: &str
     }
     let resp = req.call().map_err(|e| Error::Other(format!("download failed: {e}")))?;
     let status = resp.status().as_u16();
+    if status == 416 {
+        // The server can't continue this part: start over next time.
+        let _ = fs::remove_file(&part);
+        return Err(Error::Other("download could not resume; please try again".into()));
+    }
     let resumed = status == 206;
     if !(200..300).contains(&status) {
         return Err(Error::Other(format!("download failed: HTTP {status} for {url}")));

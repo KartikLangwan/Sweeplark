@@ -97,9 +97,11 @@ impl Agent<'_> {
         data: serde_json::Value,
     ) -> Result<i64> {
         let n = &s.agent.notify;
-        let today = start_of_local_day(local(now));
-        let under_limit = matches!(kind, MessageKind::Daily | MessageKind::Weekly | MessageKind::Approval)
-            || self.store.notified_since(today)? < u64::from(n.max_per_day);
+        // The daily limit counts pop-ups really shown, not messages kept quietly in the inbox.
+        let day_key = format!("notified:{}", local(now).format("%Y-%m-%d"));
+        let shown_today: u64 = self.store.get_state(&day_key)?.and_then(|v| v.parse().ok()).unwrap_or(0);
+        let exempt = matches!(kind, MessageKind::Daily | MessageKind::Weekly | MessageKind::Approval);
+        let under_limit = exempt || shown_today < u64::from(n.max_per_day);
         let id = self.store.add_message(kind, title, body, ai_body, &data)?;
         if n.enabled && under_limit && !schedule::in_quiet_hours(local(now), &n.quiet_from, &n.quiet_to) {
             let text = match kind {
@@ -107,6 +109,9 @@ impl Agent<'_> {
                 _ => body,
             };
             host.notify(title, text, n.sound);
+            if !exempt {
+                self.store.set_state(&day_key, &(shown_today + 1).to_string())?;
+            }
         }
         Ok(id)
     }
@@ -139,9 +144,10 @@ impl Agent<'_> {
         // 2. Housekeeping once a day.
         if self.store.get_time("last_prune")?.is_none_or(|t| now - t >= Duration::hours(24)) {
             self.store.prune(now)?;
-            self.store.expire_approvals(now, 48)?;
             self.store.set_time("last_prune", now)?;
         }
+        // Cheap: an old approval must not block scheduled cleanups for up to a day longer.
+        self.store.expire_approvals(now, 48)?;
         // 3. Smart alerts.
         if a.smart_alerts {
             let recent = self.store.samples_between(now - Duration::minutes(i64::from(a.sample_minutes) * 4), now + Duration::seconds(1))?;
@@ -152,16 +158,21 @@ impl Agent<'_> {
                 None
             };
             let items = host.startup_items();
-            let current: BTreeSet<String> = items.iter().filter(|i| i.enabled).map(|i| i.id.clone()).collect();
+            // Remember every entry, on or off: an app the user switches back on is not "new".
+            let current: BTreeSet<String> = items.iter().map(|i| i.id.clone()).collect();
             let seen: Option<BTreeSet<String>> =
                 self.store.get_state("startup_seen")?.and_then(|v| serde_json::from_str(&v).ok());
             let new_names: Vec<String> = match &seen {
                 Some(seen) => items.iter().filter(|i| i.enabled && !seen.contains(&i.id)).map(|i| i.name.clone()).collect(),
                 None => Vec::new(), // first run: remember, do not alert
             };
-            let mut all_seen = seen.unwrap_or_default();
-            all_seen.extend(current);
-            self.store.set_state("startup_seen", &serde_json::to_string(&all_seen)?)?;
+            // An empty list usually means the registry could not be read this time: keep the
+            // old memory instead of making every app look new next minute.
+            if !items.is_empty() {
+                let mut all_seen = seen.unwrap_or_default();
+                all_seen.extend(current);
+                self.store.set_state("startup_seen", &serde_json::to_string(&all_seen)?)?;
+            }
 
             for alert in triggers::evaluate(&recent, slow.as_ref(), &new_names, s.language) {
                 if !self.cooled_down(&alert.key, alert.cooldown_hours, now)? {
@@ -236,8 +247,10 @@ impl Agent<'_> {
         let mut summaries = Vec::new();
         if let Some(t) = a.daily_summary.as_deref().and_then(schedule::parse_hm) {
             let slot = schedule::last_daily_slot(local(now), t);
-            if schedule::is_due(slot, self.store.get_time("last_daily")?.map(local), local(now), Duration::hours(12)) {
-                summaries.push((false, start_of_local_day(local(now)), "last_daily"));
+            if let Some(due) = slot.filter(|_| schedule::is_due(slot, self.store.get_time("last_daily").ok().flatten().map(local), local(now), Duration::hours(12))) {
+                // Report the day of the slot (a 21:00 report caught up after midnight covers
+                // yesterday, not the first minutes of today).
+                summaries.push((false, start_of_local_day(due), "last_daily"));
             }
         }
         if let Some(w) = &a.weekly_summary

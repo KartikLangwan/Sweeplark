@@ -99,7 +99,9 @@ pub fn analyze_with(root: &Path, budget: Duration, progress: Progress) -> Storag
             }
         }
         *kinds.entry(kind(entry.path())).or_default() += size;
+        // Files directly in the root are not a "folder".
         if let Ok(rel) = entry.path().strip_prefix(root)
+            && rel.components().count() > 1
             && let Some(first) = rel.components().next()
         {
             let key = root.join(first.as_os_str());
@@ -163,6 +165,10 @@ pub fn recycle_refusal(path: &Path) -> Option<&'static str> {
         roots.extend([u.desktop_dir(), u.document_dir(), u.download_dir(), u.picture_dir(), u.video_dir(), u.audio_dir()].into_iter().flatten().map(Path::to_path_buf));
         roots.push(u.home_dir().join("AppData"));
         roots.push(u.home_dir().join("OneDrive"));
+        // Keys and credentials.
+        for secret in [".ssh", ".gnupg", ".aws", ".azure", ".kube", ".docker"] {
+            roots.push(u.home_dir().join(secret));
+        }
     }
     for var in ["APPDATA", "LOCALAPPDATA", "USERPROFILE", "PUBLIC"] {
         if let Some(v) = std::env::var_os(var) {
@@ -254,6 +260,11 @@ pub fn find_duplicates_with(root: &Path, min_bytes: u64, budget: Duration, progr
     let mut last_report = Instant::now();
     let mut complete = true;
     let mut by_size: HashMap<u64, Found> = HashMap::new();
+    let system_dirs: Vec<PathBuf> = ["SystemRoot", "ProgramFiles", "ProgramFiles(x86)", "ProgramData"]
+        .iter()
+        .filter_map(std::env::var_os)
+        .map(PathBuf::from)
+        .collect();
     let mut scanned = 0u64;
     for entry in WalkDir::new(root).follow_links(false).into_iter().flatten() {
         if started.elapsed() > budget {
@@ -261,6 +272,10 @@ pub fn find_duplicates_with(root: &Path, min_bytes: u64, budget: Duration, progr
             break;
         }
         if !entry.file_type().is_file() {
+            continue;
+        }
+        // Windows and program files are full of hard-linked copies that free nothing.
+        if system_dirs.iter().any(|d| entry.path().starts_with(d)) {
             continue;
         }
         let Ok(meta) = entry.metadata() else { continue };

@@ -164,7 +164,21 @@ fn base_name(name: &str) -> String {
     name.trim_end_matches(".exe").trim_end_matches(".EXE").to_string()
 }
 
+/// A game or 3D app left open behind another window: it has a visible window and real GPU
+/// use. Slowing it would make it stutter the moment you switch back.
+const GAME_GPU: f32 = 8.0;
+
 fn group(procs: &[ProcInfo], gpu: &HashMap<u32, f32>, keep_pid: Option<u32>, never: &[String]) -> Grouped {
+    group_with(procs, gpu, keep_pid, never, &system::visible_window_pids())
+}
+
+fn group_with(
+    procs: &[ProcInfo],
+    gpu: &HashMap<u32, f32>,
+    keep_pid: Option<u32>,
+    never: &[String],
+    windowed: &HashSet<u32>,
+) -> Grouped {
     let own = descendants(procs, &[std::process::id()]);
     let fg_name = keep_pid.and_then(|k| procs.iter().find(|p| p.pid == k)).map(|p| base_name(&p.name));
     let fg_tree = keep_pid.map(|k| descendants(procs, &[k])).unwrap_or_default();
@@ -180,7 +194,8 @@ fn group(procs: &[ProcInfo], gpu: &HashMap<u32, f32>, keep_pid: Option<u32>, nev
         if fg_name.as_deref().is_some_and(|f| f.eq_ignore_ascii_case(&name)) {
             continue;
         }
-        if is_protected(&p.name) || never_lc.contains(&key) {
+        let looks_like_game = windowed.contains(&p.pid) && gpu.get(&p.pid).copied().unwrap_or(0.0) >= GAME_GPU;
+        if is_protected(&p.name) || never_lc.contains(&key) || looks_like_game {
             if p.memory > 30 * 1024 * 1024 || p.cpu > 1.0 {
                 protected.insert(name);
             }
@@ -261,17 +276,14 @@ pub fn apply(monitor: &mut Monitor, opts: &BoostOptions, never: &[String], keep_
         if hog {
             let mut any = false;
             for pid in &a.pids {
-                let before = system::priority_class(*pid);
-                if before == Some(IDLE_PRIORITY) {
+                // Unknown old priority: leave it alone rather than guess what to restore.
+                let Some(before) = system::priority_class(*pid) else { continue };
+                if before == IDLE_PRIORITY {
                     continue; // already calm (maybe by an earlier Boost): nothing to record
                 }
                 if system::set_efficiency_mode(*pid, true).is_ok() {
                     any = true;
-                    rep.eco_changes.push(EcoChange {
-                        pid: *pid,
-                        name: format!("{}.exe", a.name),
-                        priority: before.unwrap_or(0x20), // NORMAL_PRIORITY_CLASS
-                    });
+                    rep.eco_changes.push(EcoChange { pid: *pid, name: format!("{}.exe", a.name), priority: before });
                 }
             }
             if any {
@@ -342,7 +354,7 @@ mod tests {
             p(800, Some(1), "Backup.exe", 120, 4.0),
             p(4, None, "System", 1, 1.0),
         ];
-        let g = group(&procs, &HashMap::new(), Some(500), &["backup".into()]);
+        let g = group_with(&procs, &HashMap::new(), Some(500), &["backup".into()], &HashSet::new());
         let names: Vec<&str> = g.apps.iter().map(|a| a.name.as_str()).collect();
         assert_eq!(g.foreground.as_deref(), Some("game"));
         assert!(names.contains(&"chrome"));
@@ -354,6 +366,16 @@ mod tests {
         assert!(g.protected.iter().any(|n| n == "Discord") && g.protected.iter().any(|n| n == "Backup"));
         let chrome = g.apps.iter().find(|a| a.name == "chrome").unwrap();
         assert_eq!(chrome.pids.len(), 2);
+    }
+
+    #[test]
+    fn background_game_with_window_is_left_alone() {
+        let procs = vec![p(10, Some(1), "game.exe", 3000, 20.0), p(11, Some(1), "updater.exe", 300, 6.0)];
+        let gpu: HashMap<u32, f32> = [(10, 40.0), (11, 1.0)].into();
+        let windowed: HashSet<u32> = [10].into();
+        let g = group_with(&procs, &gpu, None, &[], &windowed);
+        assert!(g.apps.iter().all(|a| a.name != "game"));
+        assert!(g.apps.iter().any(|a| a.name == "updater"));
     }
 
     #[test]

@@ -37,6 +37,21 @@ Fixed
 - Optimizer page loads faster; Home and Health refresh with the light live monitor.
 - Windows tools are started by full path from System32.
 
+Second full audit (every file read again) — also fixed
+- App leftovers never offer shared vendor folders (like `AppData\Microsoft` or `Google`), links or system folders; big folders are not ticked by default, and only offered folders can be removed.
+- Cleaning: no folder link can be swapped in between preview and delete; files only the AI called junk go to the Recycle Bin; totals no longer count files that wait for your tick; a History write problem no longer hides what was cleaned.
+- Boost: the real app behind Store-app windows (Calculator, Photos) is left alone, a game left open in the background is not slowed, Efficiency mode never leaves a process at idle priority without a way back, and Boost no longer makes the live stats wait.
+- Game mode: a maximized window is no longer taken for a game, and a game you can't read (running as admin) is not taken as closed.
+- The background agent can no longer cut off a chat answer; the AI status no longer waits for an answer; an AI download can't start twice.
+- Settings changed in the tray or by an AI download are no longer overwritten by an open Settings page; one bad value no longer resets all settings; times are checked.
+- "Restart as admin": if you say No to Windows, Sweeplark keeps running.
+- Optimizer: switching a tweak off can't get stuck after it was applied twice; tweaks for other hardware or needing admin are refused cleanly; DirectX game settings keep your other entries; the Ultimate plan is found on non-English Windows; Edge update services are no longer "recommended"; side effects are shown for 7 more tweaks.
+- Notifications: the daily limit counts only pop-ups really shown; a report caught up after midnight covers the right day; no flood of "new startup app" alerts.
+- AI guard: catches made-up measurements, more ways of saying "turn off Defender", and "I did it" claims in reports; questions match whole words ("program" is not "RAM").
+- Network reset and icon cache tools always finish their steps; slow Windows tools time out instead of hanging; winget can't hang the app.
+- UI: dialogs closed with ✕ open again, Esc and keyboard focus work in dialogs, switches never show a state that didn't save, shutdown timer asks first, deep RAM clean is no longer pre-ticked, clearer error states, stronger text contrast, and History files Optimizer changes under Optimizer.
+- Releases check that all version numbers match and only run from main; CI lints the desktop app.
+
 Lighter
 - Closing the window frees the WebView (~100 MB); Sweeplark keeps running in the tray. Starting with Windows creates no window at all.
 - The tray reads CPU/RAM/GPU only while your mouse is over the icon.

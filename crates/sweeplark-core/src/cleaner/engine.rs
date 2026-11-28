@@ -199,7 +199,7 @@ impl ScanReport {
         self.cleaners
             .iter()
             .filter(|c| matches!(c.status, PreviewStatus::Ready) && c.risk <= max_risk)
-            .map(|c| c.bytes)
+            .map(|c| c.bytes - c.flagged_bytes)
             .sum()
     }
 }
@@ -214,6 +214,11 @@ impl CleanerPreview {
         self.files = self.entries.len() as u64;
         self.bytes = self.entries.iter().map(|e| e.size).sum();
         self.refresh_flags();
+    }
+
+    /// Number of files kept back for approval (not only the first ones listed).
+    pub fn flagged_count(&self) -> u64 {
+        self.entries.iter().filter(|e| e.class != FileClass::Junk).count() as u64
     }
 
     fn refresh_flags(&mut self) {
@@ -265,7 +270,41 @@ fn resolve_bases(target: &Target, ctx: &ScanContext) -> Vec<PathBuf> {
     candidates
         .into_iter()
         .filter(|p| std::fs::symlink_metadata(p).map(|m| m.is_dir() && !m.file_type().is_symlink()).unwrap_or(false))
+        .map(|p| long_path(&p))
         .collect()
+}
+
+/// Full long-form path (no 8.3 short names like `JOHNSM~1`), so the safety guard compares
+/// like with like. `\\?\C:\...` from canonicalize becomes `C:\...`; network paths stay as given.
+fn long_path(p: &Path) -> PathBuf {
+    match std::fs::canonicalize(p) {
+        Ok(c) => {
+            let s = c.to_string_lossy();
+            match s.strip_prefix(r"\\?\") {
+                Some(rest) if !rest.starts_with("UNC") => PathBuf::from(rest),
+                Some(_) => p.to_path_buf(),
+                None => c,
+            }
+        }
+        Err(_) => p.to_path_buf(),
+    }
+}
+
+/// No folder between `base` and `file` may be a link or junction (it could have been
+/// swapped in after the preview to point somewhere else).
+fn no_links_between(base: &Path, file: &Path) -> bool {
+    let mut cur = file.parent();
+    while let Some(dir) = cur {
+        if dir == base || !dir.starts_with(base) {
+            return dir == base;
+        }
+        match std::fs::symlink_metadata(dir) {
+            Ok(m) if !m.file_type().is_symlink() => {}
+            _ => return false,
+        }
+        cur = dir.parent();
+    }
+    false
 }
 
 fn scan_files_target(
@@ -446,8 +485,9 @@ pub fn scan_with(rules: &RuleSet, ctx: &ScanContext, opts: &ScanOptions, progres
         .collect();
     progress(n, n, "");
     ScanReport {
-        total_files: cleaners.iter().filter(|c| matches!(c.status, PreviewStatus::Ready)).map(|c| c.files).sum(),
-        total_bytes: cleaners.iter().filter(|c| matches!(c.status, PreviewStatus::Ready)).map(|c| c.bytes).sum(),
+        // Only what cleaning removes by itself: files that look like the user's wait for a tick.
+        total_files: cleaners.iter().filter(|c| matches!(c.status, PreviewStatus::Ready)).map(|c| c.files - c.flagged_count()).sum(),
+        total_bytes: cleaners.iter().filter(|c| matches!(c.status, PreviewStatus::Ready)).map(|c| c.bytes - c.flagged_bytes).sum(),
         duration_ms: started.elapsed().as_millis() as u64,
         cleaners,
     }
@@ -511,7 +551,7 @@ fn remove_file_clearing_readonly(path: &Path) -> std::io::Result<()> {
 }
 
 fn delete_entry(e: &PlannedEntry, guard: &SafetyGuard) -> DeleteResult {
-    if guard.check_file(&e.base, &e.path).is_err() {
+    if guard.check_file(&e.base, &e.path).is_err() || !no_links_between(&e.base, &e.path) {
         return DeleteResult::Changed;
     }
     let meta = match std::fs::symlink_metadata(&e.path) {
@@ -529,7 +569,9 @@ fn delete_entry(e: &PlannedEntry, guard: &SafetyGuard) -> DeleteResult {
             }
             // Files that look like the user's own (approved one by one) go to the Recycle Bin,
             // so a wrong tick can be undone. Junk is deleted for good.
-            if e.class != FileClass::Junk && crate::platform::system::has_recycle_bin(&e.path) {
+            // Files only the AI called junk (the rules were unsure) are recycled as well.
+            let recycle = e.class != FileClass::Junk || e.review.is_some();
+            if recycle && crate::platform::system::has_recycle_bin(&e.path) {
                 return match crate::platform::system::to_recycle_bin(&e.path) {
                     Ok(()) => DeleteResult::Deleted(e.size),
                     Err(err) => DeleteResult::Error(format!("{}: {err}", e.path.display())),
@@ -552,16 +594,20 @@ fn delete_entry(e: &PlannedEntry, guard: &SafetyGuard) -> DeleteResult {
             if guard.check_file(&e.base, r_path).is_err() {
                 return DeleteResult::Changed;
             }
+            let mut freed = e.size;
             let r_result = match std::fs::symlink_metadata(r_path) {
                 Ok(m) if m.file_type().is_symlink() => return DeleteResult::Changed,
                 // std's remove_dir_all never follows symlinks/junctions.
                 Ok(m) if m.is_dir() => std::fs::remove_dir_all(r_path),
                 Ok(_) => remove_file_clearing_readonly(r_path),
-                Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                    freed = 0; // only the small $I record was left
+                    Ok(())
+                }
                 Err(err) => Err(err),
             };
             match r_result.and_then(|()| remove_file_clearing_readonly(&e.path)) {
-                Ok(()) => DeleteResult::Deleted(e.size),
+                Ok(()) => DeleteResult::Deleted(freed),
                 Err(err) if is_in_use(&err) => DeleteResult::InUse,
                 Err(err) => DeleteResult::Error(format!("{}: {err}", r_path.display())),
             }
@@ -600,6 +646,7 @@ pub fn clean(
 ) -> Result<CleanReport> {
     let mut out = CleanReport::default();
     let mut max_risk = Risk::Safe;
+    let approved: HashSet<&PathBuf> = approved_flagged.iter().collect();
     for preview in report.cleaners.iter().filter(|p| selected.contains(&p.id)) {
         let mut outcome = CleanOutcome { id: preview.id.clone(), name: preview.name.clone(), ..Default::default() };
         if !matches!(preview.status, PreviewStatus::Ready) {
@@ -621,7 +668,7 @@ pub fn clean(
             }
         }
         for entry in &preview.entries {
-            if entry.class != FileClass::Junk && !approved_flagged.contains(&entry.path) {
+            if entry.class != FileClass::Junk && !approved.contains(&entry.path) {
                 outcome.kept_for_approval += 1;
                 continue;
             }
@@ -657,17 +704,22 @@ pub fn clean(
         && !cleaned.is_empty()
     {
         let had_problems = out.outcomes.iter().any(|o| !o.errors.is_empty());
-        let id = ledger.record(&NewChange {
+        // Files are already gone: a ledger problem is logged, never turned into a failure
+        // that hides what was cleaned.
+        let recorded = ledger.record(&NewChange {
             category: "clean".into(),
             title: format!("Cleaned {} ({} files)", format_bytes(out.freed_bytes), out.deleted_files),
             risk: max_risk,
             status: if had_problems { ChangeStatus::Partial } else { ChangeStatus::Applied },
             bytes_freed: out.freed_bytes,
             items: out.deleted_files,
-            details: serde_json::to_value(&cleaned)?,
+            details: serde_json::to_value(&cleaned).unwrap_or_default(),
             revert: Vec::new(),
-        })?;
-        out.ledger_id = Some(id);
+        });
+        match recorded {
+            Ok(id) => out.ledger_id = Some(id),
+            Err(e) => crate::log::warn(&format!("cleaned, but History could not record it: {e}")),
+        }
     }
     Ok(out)
 }

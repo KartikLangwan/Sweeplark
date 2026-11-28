@@ -13,7 +13,7 @@ use sweeplark_core::ai::{self, AssistantReply};
 use sweeplark_core::branding;
 use sweeplark_core::cleaner::{self, CleanReport, ScanContext, ScanOptions, ScanReport};
 use sweeplark_core::health::{self, HealthSnapshot};
-use sweeplark_core::ledger::{ChangeRecord, ChangeStatus, LedgerSummary, NewChange};
+use sweeplark_core::ledger::{ChangeRecord, ChangeStatus, Ledger, LedgerSummary, NewChange};
 use sweeplark_core::optimize::{self, OptimizePlan, OptimizeReport};
 use sweeplark_core::platform::processes::ProcessList;
 use sweeplark_core::platform::registry::system_registry;
@@ -65,6 +65,26 @@ pub fn logged<T>(what: &str, r: CmdResult<T>) -> CmdResult<T> {
         sweeplark_core::log::warn(&format!("{what}: {e}"));
     }
     r
+}
+
+/// Change settings from the app itself (tray, AI download ...): saves, bumps the revision
+/// and tells an open window.
+pub fn update_settings(app: &AppHandle, f: impl FnOnce(&mut Settings)) {
+    let state = app.state::<AppState>();
+    if let Ok(mut s) = state.settings.lock() {
+        f(&mut s);
+        s.rev += 1;
+        if let Err(e) = s.save(&state.paths.settings_file()) {
+            sweeplark_core::log::warn(&format!("could not save settings: {e}"));
+        }
+    }
+    crate::settings_changed(app);
+}
+
+/// A long job gets its own database connection (WAL), so History, undo and the UI never
+/// wait behind it.
+fn own_ledger(app: &AppHandle) -> CmdResult<Ledger> {
+    Ledger::open(&app.state::<AppState>().paths.ledger_db()).map_err(err)
 }
 
 fn settings_of(app: &AppHandle) -> Settings {
@@ -136,7 +156,7 @@ pub async fn clean(app: AppHandle, ids: Vec<String>, confirmed: bool, approved_f
         let report = state.last_scan.lock().map_err(err)?.clone().ok_or("Run a scan first")?;
         let guard = sweeplark_core::safety::SafetyGuard::for_current_user(s.whitelist.clone());
         let approved: Vec<std::path::PathBuf> = approved_files.into_iter().map(Into::into).collect();
-        let ledger = state.ledger.lock().map_err(err)?;
+        let ledger = own_ledger(&app)?;
         let res = logged("clean", cleaner::clean(&report, &ids, confirmed, &approved, &guard, &ProcessList::current(), &state.rules, Some(&ledger))
             .map_err(err))?;
         *state.last_scan.lock().map_err(err)? = None;
@@ -212,9 +232,12 @@ pub async fn optimize_plan(app: AppHandle) -> CmdResult<OptimizePlan> {
 pub async fn optimize_apply(app: AppHandle) -> CmdResult<OptimizeReport> {
     blocking(move || {
         let state = app.state::<AppState>();
-        let plan = state.last_plan.lock().map_err(err)?.take().ok_or("Run a scan first")?;
-        let ledger = state.ledger.lock().map_err(err)?;
-        optimize::apply(&plan, &state.rules, &settings_of(&app), &ledger).map_err(err)
+        // Kept until it worked, so a failed attempt can simply be tried again.
+        let plan = state.last_plan.lock().map_err(err)?.clone().ok_or("Run a scan first")?;
+        let ledger = own_ledger(&app)?;
+        let report = optimize::apply(&plan, &state.rules, &settings_of(&app), &ledger).map_err(err)?;
+        *state.last_plan.lock().map_err(err)? = None;
+        Ok(report)
     })
     .await
 }
@@ -227,23 +250,32 @@ pub fn settings_get(state: State<'_, AppState>) -> CmdResult<Settings> {
 pub fn apply_autostart(app: &AppHandle) {
     let want = settings_of(app).agent.start_with_windows;
     let launcher = app.autolaunch();
-    let on = launcher.is_enabled().unwrap_or(false);
-    if want && !on {
+    if want {
+        // Always (re)write it: after an update or moving the exe the old path would be stale.
         let _ = launcher.enable();
-    } else if !want && on {
+    } else if launcher.is_enabled().unwrap_or(false) {
         let _ = launcher.disable();
     }
+    crate::tray::set_autostart_check(want);
 }
 
 #[tauri::command]
-pub async fn settings_set(app: AppHandle, settings: Settings) -> CmdResult<()> {
+pub async fn settings_set(app: AppHandle, settings: Settings) -> CmdResult<Settings> {
     blocking(move || {
         let state = app.state::<AppState>();
-        let settings = settings.sanitized();
-        settings.save(&state.paths.settings_file()).map_err(err)?;
-        *state.settings.lock().map_err(err)? = settings;
+        let mut settings = settings.sanitized();
+        {
+            let mut cur = state.settings.lock().map_err(err)?;
+            if settings.rev != cur.rev {
+                // Changed meanwhile (tray, AI download): the window reloads instead of overwriting.
+                return Err("settings_changed".into());
+            }
+            settings.rev += 1;
+            settings.save(&state.paths.settings_file()).map_err(err)?;
+            *cur = settings.clone();
+        }
         apply_autostart(&app);
-        Ok(())
+        Ok(settings)
     })
     .await
 }
@@ -259,10 +291,14 @@ pub fn settings_export(state: State<'_, AppState>) -> CmdResult<String> {
 pub async fn settings_import(app: AppHandle, json: String) -> CmdResult<Settings> {
     blocking(move || {
         let parsed: Settings = serde_json::from_str(json.trim()).map_err(|e| format!("Not valid Sweeplark settings: {e}"))?;
-        let parsed = parsed.sanitized();
+        let mut parsed = parsed.sanitized();
         let state = app.state::<AppState>();
-        parsed.save(&state.paths.settings_file()).map_err(err)?;
-        *state.settings.lock().map_err(err)? = parsed.clone();
+        {
+            let mut cur = state.settings.lock().map_err(err)?;
+            parsed.rev = cur.rev + 1;
+            parsed.save(&state.paths.settings_file()).map_err(err)?;
+            *cur = parsed.clone();
+        }
         apply_autostart(&app);
         sweeplark_core::log::info("settings imported");
         Ok(parsed)
@@ -303,21 +339,33 @@ pub async fn approval_decide(app: AppHandle, id: i64, approve: bool, files: Vec<
         let app = app.clone();
         move || {
             let state = app.state::<AppState>();
-            let approval = state.store.lock().map_err(err)?.approval(id).map_err(err)?.ok_or("Request not found")?;
-            if approval.status != ApprovalStatus::Pending {
-                return Err("This request was already decided".into());
-            }
+            // Check and mark in one step (under the lock), so a double click can't run it twice.
+            let approval = {
+                let store = state.store.lock().map_err(err)?;
+                let a = store.approval(id).map_err(err)?.ok_or("Request not found")?;
+                if a.status != ApprovalStatus::Pending {
+                    return Err("This request was already decided".into());
+                }
+                store
+                    .set_approval_status(id, if approve { ApprovalStatus::Approved } else { ApprovalStatus::Declined })
+                    .map_err(err)?;
+                a
+            };
             if !approve {
-                state.store.lock().map_err(err)?.set_approval_status(id, ApprovalStatus::Declined).map_err(err)?;
                 return Ok(None);
             }
             let detail: ApprovalDetail = serde_json::from_value(approval.detail).map_err(err)?;
             let s = settings_of(&app);
             let ctx = ScanContext::system(&s);
-            let ledger = state.ledger.lock().map_err(err)?;
-            let report = autoclean::apply_approval(&detail, &files, &state.rules, &s, &ctx, &ledger).map_err(err)?;
-            state.store.lock().map_err(err)?.set_approval_status(id, ApprovalStatus::Approved).map_err(err)?;
-            Ok(Some(report))
+            let ledger = own_ledger(&app)?;
+            match autoclean::apply_approval(&detail, &files, &state.rules, &s, &ctx, &ledger) {
+                Ok(report) => Ok(Some(report)),
+                Err(e) => {
+                    // Nothing was done: let the user try again.
+                    let _ = state.store.lock().map(|st| st.set_approval_status(id, ApprovalStatus::Pending));
+                    Err(e.to_string())
+                }
+            }
         }
     })
     .await;
@@ -388,12 +436,20 @@ pub fn ai_install(app: AppHandle, tier: Tier, cancel: bool) -> CmdResult<()> {
         state.ai.cancel.store(true, Ordering::Relaxed);
         return Ok(());
     }
-    if state.ai.progress.lock().map_err(err)?.as_ref().is_some_and(|p| p.stage == "runtime" || p.stage == "model") {
+    // Marked busy before the thread starts, so a double click can't start two downloads.
+    if state.ai.installing.swap(true, Ordering::SeqCst) {
         return Err("A download is already running".into());
     }
     state.ai.cancel.store(false, Ordering::Relaxed);
     std::thread::spawn(move || {
         let state = app.state::<AppState>();
+        struct Done<'a>(&'a std::sync::atomic::AtomicBool);
+        impl Drop for Done<'_> {
+            fn drop(&mut self) {
+                self.0.store(false, Ordering::SeqCst);
+            }
+        }
+        let _done = Done(&state.ai.installing);
         let emit = |p: InstallProgress| {
             state.ai.set_progress(p.clone());
             let _ = app.emit("ai-progress", p);
@@ -426,12 +482,10 @@ pub fn ai_install(app: AppHandle, tier: Tier, cancel: bool) -> CmdResult<()> {
         })();
         match result {
             Ok(()) => {
-                if let Ok(mut st) = state.settings.lock() {
+                update_settings(&app, |st| {
                     st.ai.enabled = true;
                     st.ai.tier = Some(tier);
-                    let _ = st.save(&state.paths.settings_file());
-                }
-                crate::settings_changed(&app);
+                });
                 sweeplark_core::log::info(&format!("AI model installed: {tier:?}"));
                 emit(InstallProgress { stage: "done".into(), tier: Some(tier), done: 1, total: 1, error: None });
             }
@@ -452,11 +506,11 @@ pub async fn ai_remove(app: AppHandle, tier: Tier) -> CmdResult<()> {
             state.ai.unload();
         }
         runtime::remove_model(&state.ai.paths, state.catalog.get(tier)).map_err(err)?;
-        let mut s = state.settings.lock().map_err(err)?;
-        if s.ai.tier == Some(tier) {
-            s.ai.enabled = false;
-            s.ai.tier = None;
-            s.save(&state.paths.settings_file()).map_err(err)?;
+        if state.settings.lock().map(|s| s.ai.tier == Some(tier)).unwrap_or(false) {
+            update_settings(&app, |s| {
+                s.ai.enabled = false;
+                s.ai.tier = None;
+            });
         }
         Ok(())
     })
@@ -507,7 +561,7 @@ impl PcSource for RealPc {
     fn background(&self) -> Option<sweeplark_core::boost::BoostPlan> {
         let never = crate::pc::never_list(&self.app);
         let state = self.app.state::<AppState>();
-        let mut m = state.monitor.lock().ok()?;
+        let mut m = state.boost_monitor.lock().ok()?;
         Some(sweeplark_core::boost::plan(&mut m, &never))
     }
     fn apps(&self) -> Vec<sweeplark_core::apps::InstalledApp> {
@@ -616,25 +670,36 @@ pub fn open_windows_security() -> CmdResult<()> {
 }
 
 /// Start Sweeplark again as administrator (Windows asks with UAC) and open `page` there.
-/// Settings, history and the AI model are shared, so nothing is lost.
+/// Settings and History are shared. If the user says No to UAC, this copy keeps running.
 #[tauri::command]
-pub fn relaunch_as_admin(app: AppHandle, page: Option<String>) -> CmdResult<()> {
+pub async fn relaunch_as_admin(app: AppHandle, page: Option<String>) -> CmdResult<()> {
     #[cfg(windows)]
     {
-        use std::os::windows::process::CommandExt;
         let exe = std::env::current_exe().map_err(err)?;
-        let page = page.filter(|p| p.chars().all(|c| c.is_ascii_lowercase())).unwrap_or_default();
-        let args = if page.is_empty() { String::new() } else { format!(" -ArgumentList '--page={page}'") };
+        let page = page.filter(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_lowercase())).unwrap_or_else(|| "home".into());
+        let pid = std::process::id();
+        // Each piece is passed as its own PowerShell string (single quotes doubled inside).
+        let q = |s: &str| format!("'{}'", s.replace('\'', "''").replace(['\u{2018}', '\u{2019}', '\u{201A}', '\u{201B}'], "''"));
         let script = format!(
-            "Start-Sleep -Milliseconds 800; Start-Process -FilePath '{}' -Verb RunAs{args}",
-            exe.display().to_string().replace('\'', "''")
+            "$ErrorActionPreference='Stop'; Start-Process -FilePath {} -Verb RunAs -ArgumentList {},{}",
+            q(&exe.display().to_string()),
+            q(&format!("--page={page}")),
+            q(&format!("--wait-parent={pid}"))
         );
+        let out = blocking(move || {
+            sweeplark_core::platform::ops::run_timeout(
+                "powershell",
+                &["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", &script],
+                std::time::Duration::from_secs(300),
+            )
+            .map_err(err)
+        })
+        .await?;
+        if !out.status.success() {
+            sweeplark_core::log::info("restart as administrator cancelled");
+            return Err("Administrator permission was not given.".into());
+        }
         sweeplark_core::log::info("restarting as administrator");
-        std::process::Command::new(sweeplark_core::platform::ops::system_exe("powershell"))
-            .args(["-NoProfile", "-WindowStyle", "Hidden", "-Command", &script])
-            .creation_flags(0x0800_0000)
-            .spawn()
-            .map_err(err)?;
         crate::quit(&app);
     }
     #[cfg(not(windows))]
@@ -705,11 +770,8 @@ pub async fn update_skip(app: AppHandle, version: String) -> CmdResult<()> {
 }
 
 fn update_skip_inner(app: &AppHandle, version: String) -> CmdResult<()> {
-    let state = app.state::<AppState>();
-    let mut s = state.settings.lock().map_err(err)?;
-    s.skipped_version = Some(version);
-    s.save(&state.paths.settings_file()).map_err(err)?;
-    *state.update.lock().map_err(err)? = None;
+    update_settings(app, |s| s.skipped_version = Some(version));
+    *app.state::<AppState>().update.lock().map_err(err)? = None;
     Ok(())
 }
 
@@ -717,6 +779,16 @@ fn update_skip_inner(app: &AppHandle, version: String) -> CmdResult<()> {
 /// Portable copies just open the release page.
 #[tauri::command]
 pub async fn update_install(app: AppHandle) -> CmdResult<()> {
+    static RUNNING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    if RUNNING.swap(true, Ordering::SeqCst) {
+        return Err("The update is already downloading".into());
+    }
+    let r = update_install_inner(app).await;
+    RUNNING.store(false, Ordering::SeqCst);
+    r
+}
+
+async fn update_install_inner(app: AppHandle) -> CmdResult<()> {
     let info = app.state::<AppState>().update.lock().map_err(err)?.clone().ok_or("No update")?;
     if sweeplark_core::paths::AppPaths::is_portable() || info.setup_url.is_none() {
         return open_url(info.page_url.clone());

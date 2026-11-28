@@ -387,12 +387,12 @@ pub struct Answer {
 
 fn topic_for(question: &str) -> Option<Topic> {
     let q = question.to_lowercase();
-    let has = |words: &[&str]| words.iter().any(|w| q.contains(w));
+    let has = |words: &[&str]| words.iter().any(|w| crate::util::has_word(&q, w));
     if has(&["battery", "charge", "charging", "betri"]) {
         Some(Topic::Battery)
-    } else if has(&["garam", "heat", "temp", "fan", "hot", "garmi"]) {
+    } else if has(&["garam", "heat", "temperature", "fan", "hot", "garmi"]) {
         Some(Topic::Heat)
-    } else if has(&["virus", "secur", "safe", "defender", "firewall", "hack", "antivirus", "suraksha"]) {
+    } else if has(&["virus", "secur", "defender", "firewall", "hack", "antivirus", "suraksha"]) {
         Some(Topic::Security)
     } else if has(&["space", "jagah", "storage", "disk", "bhar", "full", "gb", "drive"]) {
         Some(Topic::Storage)

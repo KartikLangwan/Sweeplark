@@ -96,7 +96,7 @@ let settings: Settings = {
   },
   ai: { enabled: true, tier: "balanced", use_gpu: true, unload_after_secs: 120, review_files: true, write_summaries: true },
   check_updates: true, skipped_version: null,
-  boost: { never: [], auto_game: false, ram_guard: false, ram_guard_percent: 88 }, restore_point_before_tweaks: true,
+  boost: { never: [], auto_game: false, ram_guard: false, ram_guard_percent: 88 }, restore_point_before_tweaks: true, rev: 0,
 };
 
 const approvals: Approval[] = [{
@@ -172,7 +172,8 @@ export async function mock<T>(cmd: string, args: Record<string, unknown> = {}): 
       groups: [["wedding-4k.mp4", 2.1 * GB], ["setup.exe", 640 * MB], ["IMG_2041.jpg", 6 * MB]].map(([n, b]) => ({ bytes: Number(b), files: ["Videos", "Downloads\\old", "Desktop"].slice(0, n === "setup.exe" ? 3 : 2).map((d, i) => ({ path: `C:\\Users\\amit\\${d}\\${n}`, bytes: Number(b), files: 1, modified: 1700000000 + i * 86400 * 30 })) })) },
     apps_list: [["Google Chrome", "Google LLC", 620], ["Spotify", "Spotify AB", 410], ["Zoom Workplace", "Zoom", 280], ["7-Zip 23.01 (x64)", "Igor Pavlov", 6], ["Steam", "Valve", 1200]].map(([name, publisher, mb], i) => ({ id: `m:64:${i}`, name: String(name), publisher: String(publisher), version: "1.0", size_bytes: Number(mb) * MB, install_date: "20250102", location: null, for_all_users: i % 2 === 0 })),
     app_updates: [{ name: "Mozilla Firefox", id: "Mozilla.Firefox", current: "120.0", available: "121.0" }, { name: "7-Zip", id: "7zip.7zip", current: "22.01", available: "23.01" }],
-    app_leftovers: ["C:\\Users\\amit\\AppData\\Roaming\\Zoom"],
+    app_leftovers: [{ path: "C:\\Users\\amit\\AppData\\Roaming\\Zoom", bytes: 48 * MB, files: 120, partial: false }],
+    app_leftovers_remove: 1,
     settings_export: JSON.stringify(settings, null, 2),
     take_pending_page: null,
     bug_report: "Sweeplark 1.4.1\nWindows: Windows 11 Home\n\nWhat happened:\n",
@@ -201,7 +202,7 @@ export async function mock<T>(cmd: string, args: Record<string, unknown> = {}): 
     power_plans: [{ guid: "381b4222-f694-41f0-9685-ff5bb260df2e", name: "Balanced", active: true }, { guid: "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c", name: "High performance", active: false }],
     update_check: { version: "1.5.0", notes: "• Faster scans\n• New cleaners for WhatsApp Desktop and Zoom\n• Smaller installer", published_at: iso(60 * 5), page_url: "https://github.com/KartikLangwan/sweeplark/releases", setup_url: "x", setup_size: 4.1 * MB, setup_sha256: "x" },
   };
-  if (cmd === "settings_set") settings = args.settings as Settings;
+  if (cmd === "settings_set") { settings = { ...(args.settings as Settings), rev: (args.settings as Settings).rev + 1 }; return settings as T; }
   if (cmd === "startup_set") {
     const it = startup.find((s) => s.id === args.id);
     if (it) it.enabled = args.enabled as boolean;

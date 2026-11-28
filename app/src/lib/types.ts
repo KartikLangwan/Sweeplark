@@ -119,6 +119,7 @@ export interface Settings {
   skipped_version: string | null;
   boost: { never: string[]; auto_game: boolean; ram_guard: boolean; ram_guard_percent: number };
   restore_point_before_tweaks: boolean;
+  rev: number;
 }
 export interface AppInfo {
   name: string; tagline: string; tagline_hi: string; version: string; is_admin: boolean; os: string;
@@ -145,6 +146,7 @@ export interface SizedPath { path: string; bytes: number; files: number; modifie
 export interface DuplicateGroup { bytes: number; files: SizedPath[] }
 export interface DuplicateReport { root: string; groups: DuplicateGroup[]; wasted_bytes: number; scanned_files: number; complete: boolean; duration_ms: number }
 export interface InstalledApp { id: string; name: string; publisher: string | null; version: string | null; size_bytes: number | null; install_date: string | null; location: string | null; for_all_users: boolean }
+export interface Leftover { path: string; bytes: number; files: number; partial: boolean }
 export interface AppUpdate { name: string; id: string; current: string; available: string }
 export interface JobProgress { job: string; done: number; total: number; text: string }
 export interface StorageReport {

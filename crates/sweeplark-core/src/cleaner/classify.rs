@@ -20,7 +20,7 @@ pub enum FileClass {
 const JUNK: &[&str] = &[
     "tmp", "temp", "log", "etl", "evtx", "dmp", "mdmp", "hdmp", "old", "chk", "gid", "cache", "crdownload",
     "partial", "part", "dat", "db-journal", "db-wal", "db-shm", "ldb", "blob", "idx", "pma", "lock", "pf", "cab",
-    "wer", "trace", "diagsession", "pdb", "ilk", "obj", "pch", "ipch", "tlog", "lastbuildstate", "thumbs",
+    "wer", "trace", "diagsession", "pdb", "ilk", "pch", "ipch", "tlog", "lastbuildstate", "thumbs",
 ];
 
 const USER_DATA: &[(&str, &[&str])] = &[
@@ -30,7 +30,7 @@ const USER_DATA: &[(&str, &[&str])] = &[
     ("audio", &["mp3", "wav", "m4a", "aac", "flac", "ogg", "opus", "wma", "amr"]),
     ("archive", &["zip", "rar", "7z", "tar", "gz", "bz2", "xz", "iso"]),
     ("installer", &["exe", "msi", "msix", "appx", "apk"]),
-    ("project", &["sln", "csproj", "py", "ipynb", "java", "kt", "rs", "go", "cpp", "c", "h", "cs", "js", "ts", "php", "sql", "blend", "fig", "ai", "indd", "dwg", "prproj", "aep"]),
+    ("project", &["obj", "fbx", "stl", "sln", "csproj", "py", "ipynb", "java", "kt", "rs", "go", "cpp", "c", "h", "cs", "js", "ts", "php", "sql", "blend", "fig", "ai", "indd", "dwg", "prproj", "aep"]),
     ("save / data", &["sav", "save", "bak", "kdbx", "pst", "ost", "eml", "msg", "vcf", "ics", "json", "xml", "db", "sqlite"]),
 ];
 

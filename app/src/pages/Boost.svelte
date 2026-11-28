@@ -26,7 +26,8 @@
       const p = await api.boostPlan();
       for (const a of p.apps) if (!(a.name in picked)) picked[a.name] = true;
       results.boostPlan = p;
-      if (p.can_purge_standby && !report) opts.purge_standby = true;
+      // Deep clean is offered only after the user ticks it: dropping the file cache makes
+      // apps load files from disk again.
     } catch (e) { toast(String(e), "warn"); }
     loading = false;
   }
@@ -124,9 +125,9 @@
         <div class="card">
           <div class="card-title"><Icon name="game" /><h3>{t("Automatic", "Apne aap")}</h3></div>
           <div class="setting"><div><strong>{t("Game mode", "Game mode")}</strong><p class="muted small">{t("When a game runs full screen, heavy background apps calm down, and go back to normal when it closes.", "Game full screen chale toh bhari background apps shaant; game band hote hi normal.")}</p></div>
-            <Toggle checked={ui.settings.boost.auto_game} onchange={(v) => setBoost({ auto_game: v })} label="Game mode" /></div>
+            <Toggle controlled checked={ui.settings.boost.auto_game} onchange={(v) => setBoost({ auto_game: v })} label="Game mode" /></div>
           <div class="setting"><div><strong>{t("RAM guard", "RAM guard")}</strong><p class="muted small">{t(`When RAM stays above ${ui.settings.boost.ram_guard_percent}% for a minute, free RAM from background apps (at most every 10 minutes).`, `RAM ek minute tak ${ui.settings.boost.ram_guard_percent}% se upar rahe toh background apps ki RAM khaali (10 minute mein ek baar).`)}</p></div>
-            <Toggle checked={ui.settings.boost.ram_guard} onchange={(v) => setBoost({ ram_guard: v })} label="RAM guard" /></div>
+            <Toggle controlled checked={ui.settings.boost.ram_guard} onchange={(v) => setBoost({ ram_guard: v })} label="RAM guard" /></div>
           {#if ui.settings.boost.ram_guard}
             <div class="row small muted"><span>{t("Limit", "Seema")}</span><input type="range" min="75" max="95" step="1" value={ui.settings.boost.ram_guard_percent} onchange={(e) => setBoost({ ram_guard_percent: Number((e.target as HTMLInputElement).value) })} /><span class="num">{ui.settings.boost.ram_guard_percent}%</span></div>
           {/if}

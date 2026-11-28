@@ -11,7 +11,7 @@
   let eco = $state<Record<string, boolean>>({});
 
   onMount(() => {
-    api.health(true).then((x) => (h = x));
+    api.health(true).then((x) => (h = x)).catch((e) => toast(String(e), "warn"));
     // Light refresh from the shared live monitor; the full snapshot is read once.
     const t = setInterval(() => api.live().then((l) => { if (h) h = { ...h, memory_used: l.ram_used, cpu_percent: l.cpu_percent, swap_used: l.swap_used }; }).catch(() => {}), 4000);
     return () => clearInterval(t);

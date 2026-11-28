@@ -23,7 +23,8 @@ pub struct RegItem {
     /// Integer → DWORD, string → REG_SZ (see `kind`).
     #[serde(default)]
     pub value: Option<toml::Value>,
-    /// "qword" or "expand" to override the type.
+    /// "qword" or "expand" to override the type, or "flags": a `Key=Value;` list where only
+    /// the named keys are changed and other entries are kept (DirectX settings string).
     #[serde(default)]
     pub kind: Option<String>,
     /// Delete the value instead of writing it.
@@ -107,7 +108,10 @@ pub struct TweakDef {
 
 impl TweakDef {
     pub fn needs_admin(&self) -> bool {
-        self.registry.iter().any(|r| r.key.to_ascii_uppercase().starts_with("HKLM") || r.key.starts_with("{gpu"))
+        self.registry.iter().any(|r| {
+            let k = r.key.to_ascii_uppercase();
+            k.starts_with("HKLM") || k.starts_with("HKEY_LOCAL_MACHINE") || r.key.starts_with("{gpu")
+        })
             || !self.services.is_empty()
             || !self.tasks.is_empty()
             || self.action.is_some()
@@ -163,8 +167,9 @@ impl TweakSet {
                 if !r.delete && r.value.is_none() {
                     return Err(err(format!("tweak '{}': value missing for {}", t.id, r.name)));
                 }
-                if let Some(v) = &r.value {
-                    to_reg(v, r.kind.as_deref()).ok_or_else(|| err(format!("tweak '{}': bad value for {}", t.id, r.name)))?;
+                for v in [&r.value, &r.off].into_iter().flatten() {
+                    let kind = if is_flags(r) { None } else { r.kind.as_deref() };
+                    to_reg(v, kind).ok_or_else(|| err(format!("tweak '{}': bad value for {}", t.id, r.name)))?;
                 }
             }
             for s in &t.services {
@@ -188,6 +193,48 @@ fn to_reg(v: &toml::Value, kind: Option<&str>) -> Option<RegValue> {
         (toml::Value::String(s), _) => RegValue::Sz(s.clone()),
         _ => return None,
     })
+}
+
+/// `Key=Value;` entries of a flags string, in order.
+fn flag_pairs(s: &str) -> Vec<(String, String)> {
+    s.split(';')
+        .filter_map(|p| {
+            let (k, v) = p.split_once('=')?;
+            let k = k.trim();
+            (!k.is_empty()).then(|| (k.to_string(), v.trim().to_string()))
+        })
+        .collect()
+}
+
+/// `current` with the entries of `want` set (others kept).
+fn merge_flags(current: &str, want: &str) -> String {
+    let mut pairs = flag_pairs(current);
+    for (k, v) in flag_pairs(want) {
+        match pairs.iter_mut().find(|(pk, _)| pk.eq_ignore_ascii_case(&k)) {
+            Some(p) => p.1 = v,
+            None => pairs.push((k, v)),
+        }
+    }
+    pairs.iter().map(|(k, v)| format!("{k}={v};")).collect()
+}
+
+fn flags_contain(current: &str, want: &str) -> bool {
+    let have = flag_pairs(current);
+    flag_pairs(want).iter().all(|(k, v)| have.iter().any(|(hk, hv)| hk.eq_ignore_ascii_case(k) && hv == v))
+}
+
+fn is_flags(r: &RegItem) -> bool {
+    r.kind.as_deref() == Some("flags")
+}
+
+/// The value to write for `r` given what is there now (flags merge into the current string).
+fn target_value(r: &RegItem, v: &toml::Value, current: Option<&RegValue>) -> Option<RegValue> {
+    if is_flags(r) {
+        let want = v.as_str()?;
+        let cur = current.and_then(|c| c.as_string()).unwrap_or("");
+        return Some(RegValue::Sz(merge_flags(cur, want)));
+    }
+    to_reg(v, r.kind.as_deref())
 }
 
 fn start_code(s: &str) -> Option<u32> {
@@ -319,6 +366,9 @@ pub fn is_applied(t: &TweakDef, reg: &dyn RegistryBackend, check_tasks: bool) ->
             let cur = reg.read_value(hive, &key, &r.name).ok().flatten();
             let ok = if r.delete {
                 cur.is_none()
+            } else if is_flags(r) {
+                let want = r.value.as_ref().and_then(|v| v.as_str()).unwrap_or("");
+                cur.as_ref().and_then(|c| c.as_string()).is_some_and(|c| flags_contain(c, want))
             } else {
                 let want = r.value.as_ref().and_then(|v| to_reg(v, r.kind.as_deref()));
                 match (&cur, &want) {
@@ -349,7 +399,7 @@ pub fn is_applied(t: &TweakDef, reg: &dyn RegistryBackend, check_tasks: bool) ->
     }
     match t.action.as_deref() {
         Some("hibernate_off") => ops::hibernate_enabled() != Some(true),
-        Some("ultimate_plan") => ops::power_plans().iter().any(|p| p.active && p.name.to_lowercase().contains("ultimate")),
+        Some("ultimate_plan") => ops::power_plans().iter().any(|p| p.active && ops::is_ultimate(p)),
         _ => true,
     }
 }
@@ -398,14 +448,22 @@ fn write_reg(
 
 /// Apply a tweak and record how to undo it. Returns the ledger id.
 pub fn apply(t: &TweakDef, reg: &dyn RegistryBackend, ledger: &Ledger, ctx: &TweakContext) -> Result<i64> {
+    if !ctx.allows(t) {
+        return Err(Error::Other(tr!(ctx.lang, "'{}' is not for this PC.", "'{}' is PC ke liye nahi hai.", t.name)));
+    }
     if t.needs_admin() && !ctx.is_admin {
         return Err(Error::NeedsAdmin(t.name.clone()));
     }
     let mut steps = Vec::new();
     let result = (|| -> Result<()> {
         for r in &t.registry {
-            let value = if r.delete { None } else { r.value.as_ref().and_then(|v| to_reg(v, r.kind.as_deref())) };
             for (hive, key) in resolve_keys(&r.key, reg) {
+                let value = if r.delete {
+                    None
+                } else {
+                    let cur = reg.read_value(hive, &key, &r.name)?;
+                    r.value.as_ref().and_then(|v| target_value(r, v, cur.as_ref()))
+                };
                 write_reg(reg, hive, &key, &r.name, value.as_ref(), &mut steps)?;
             }
         }
@@ -432,11 +490,7 @@ pub fn apply(t: &TweakDef, reg: &dyn RegistryBackend, ledger: &Ledger, ctx: &Twe
             }
             Some("ultimate_plan") => {
                 let before = ops::active_power_plan();
-                let existing = ops::power_plans().into_iter().find(|p| p.name.to_lowercase().contains("ultimate"));
-                let guid = match existing {
-                    Some(p) => p.guid,
-                    None => ops::add_ultimate_plan()?,
-                };
+                let guid = ops::add_ultimate_plan()?;
                 ops::set_power_plan(&guid)?;
                 if let Some(b) = before {
                     steps.push(RevertStep::PowerPlan { guid: b });
@@ -450,6 +504,11 @@ pub fn apply(t: &TweakDef, reg: &dyn RegistryBackend, ledger: &Ledger, ctx: &Twe
         // Roll back what was already changed, then report.
         let _ = crate::revert::apply_all(&steps, reg);
         return Err(e);
+    }
+    // Already in effect: nothing changed, so nothing to record (an empty record would hide
+    // the real one from "switch off").
+    if steps.is_empty() {
+        return Ok(0);
     }
     let name = &t.name;
     ledger.record(&NewChange {
@@ -466,6 +525,10 @@ pub fn apply(t: &TweakDef, reg: &dyn RegistryBackend, ledger: &Ledger, ctx: &Twe
 
 /// Switch a tweak off: undo Sweeplark's last change, or for settings write the "off" values.
 pub fn unapply(t: &TweakDef, reg: &dyn RegistryBackend, ledger: &Ledger, ctx: &TweakContext) -> Result<()> {
+    // Check rights first, so a half-undone tweak (user part back, machine part not) can't happen.
+    if t.needs_admin() && !ctx.is_admin {
+        return Err(Error::NeedsAdmin(t.name.clone()));
+    }
     if let Some(rec) = ledger.latest_undoable("tweak", &t.id)? {
         ledger.undo(rec.id, reg)?;
         return Ok(());
@@ -480,8 +543,9 @@ pub fn unapply(t: &TweakDef, reg: &dyn RegistryBackend, ledger: &Ledger, ctx: &T
     }
     let mut steps = Vec::new();
     for r in &t.registry {
-        let value = r.off.as_ref().and_then(|v| to_reg(v, r.kind.as_deref()));
         for (hive, key) in resolve_keys(&r.key, reg) {
+            let cur = reg.read_value(hive, &key, &r.name)?;
+            let value = r.off.as_ref().and_then(|v| target_value(r, v, cur.as_ref()));
             write_reg(reg, hive, &key, &r.name, value.as_ref(), &mut steps)?;
         }
     }
@@ -586,6 +650,44 @@ start = "disabled"
         let keys = resolve_keys("{gpu:nvidia}", &reg);
         assert_eq!(keys.len(), 1);
         assert!(keys[0].1.ends_with("0000"));
+    }
+
+    #[test]
+    fn flags_merge_keeps_other_entries_and_empty_apply_is_not_recorded() {
+        assert_eq!(merge_flags("VRROptimizeEnable=0;", "SwapEffectUpgradeEnable=1;"), "VRROptimizeEnable=0;SwapEffectUpgradeEnable=1;");
+        assert_eq!(merge_flags("SwapEffectUpgradeEnable=0;AutoHDREnable=1;", "SwapEffectUpgradeEnable=1;"), "SwapEffectUpgradeEnable=1;AutoHDREnable=1;");
+        assert!(flags_contain("A=1;SwapEffectUpgradeEnable=1;", "SwapEffectUpgradeEnable=1;"));
+        let mut set = TweakSet::default();
+        set.add_file(
+            "f.toml",
+            r#"
+[[tweak]]
+id = "gaming.windowed"
+name = "Windowed"
+description = "x"
+category = "gaming"
+risk = "safe"
+setting = true
+[[tweak.registry]]
+key = 'HKCU\Software\Microsoft\DirectX\UserGpuPreferences'
+name = "DirectXUserGlobalSettings"
+kind = "flags"
+value = "SwapEffectUpgradeEnable=1;"
+off = "SwapEffectUpgradeEnable=0;"
+"#,
+        )
+        .unwrap();
+        let reg = MemRegistry::default();
+        let key = r"Software\Microsoft\DirectX\UserGpuPreferences";
+        reg.write_value(Hive::CurrentUser, key, "DirectXUserGlobalSettings", &RegValue::Sz("VRROptimizeEnable=0;".into())).unwrap();
+        let ledger = Ledger::open_in_memory().unwrap();
+        let t = set.get("gaming.windowed").unwrap();
+        let id = apply(t, &reg, &ledger, &ctx()).unwrap();
+        assert!(id > 0);
+        assert!(is_applied(t, &reg, false));
+        assert_eq!(apply(t, &reg, &ledger, &ctx()).unwrap(), 0, "second apply changes nothing and records nothing");
+        unapply(t, &reg, &ledger, &ctx()).unwrap();
+        assert_eq!(reg.read_value(Hive::CurrentUser, key, "DirectXUserGlobalSettings").unwrap(), Some(RegValue::Sz("VRROptimizeEnable=0;".into())));
     }
 
     #[test]

@@ -96,12 +96,17 @@ pub async fn tweaks_apply_recommended(app: AppHandle, ids: Vec<String>) -> CmdRe
         let restore_point = restore_point_first(&app, any_admin);
         let ledger = state.ledger.lock().map_err(err)?;
         let reg = system_registry();
+        let max_risk = state.settings.lock().map(|s| s.trust_level.max_risk()).unwrap_or(sweeplark_core::Risk::Ask);
         let mut out = BulkResult { applied: Vec::new(), skipped: Vec::new(), restore_point };
         let total = ids.len() as u64;
         let mut progress = crate::commands::progress_emitter(&app, "tweaks");
         for (i, id) in ids.iter().enumerate() {
             let Some(t) = state.tweaks.get(id) else { continue };
             progress(i as u64, total, &t.name);
+            if t.risk > max_risk {
+                out.skipped.push((t.name.clone(), "above your trust level".into()));
+                continue;
+            }
             match tweaks::apply(t, reg.as_ref(), &ledger, &c) {
                 Ok(_) => out.applied.push(t.name.clone()),
                 Err(e) => {
@@ -173,7 +178,11 @@ pub async fn storage_recycle(path: String) -> CmdResult<()> {
 #[tauri::command]
 pub fn reveal_path(path: String) -> CmdResult<()> {
     #[cfg(windows)]
-    std::process::Command::new(ops::system_exe("explorer.exe")).arg(format!("/select,{path}")).spawn().map_err(err)?;
+    {
+        use std::os::windows::process::CommandExt;
+        // Explorer wants exactly: /select,"C:\\path with spaces\\file"
+        std::process::Command::new(ops::system_exe("explorer.exe")).raw_arg(format!("/select,\"{}\"", path.replace('"', ""))).spawn().map_err(err)?;
+    }
     let _ = path;
     Ok(())
 }
@@ -221,7 +230,7 @@ pub async fn boost_plan(app: AppHandle) -> CmdResult<sweeplark_core::boost::Boos
     blocking(move || {
         let never = never_list(&app);
         let state = app.state::<AppState>();
-        let mut m = state.monitor.lock().map_err(err)?;
+        let mut m = state.boost_monitor.lock().map_err(err)?;
         Ok(sweeplark_core::boost::plan(&mut m, &never))
     })
     .await
@@ -241,7 +250,7 @@ pub async fn boost_apply(app: AppHandle, options: sweeplark_core::boost::BoostOp
         let never = never_list(&app);
         let state = app.state::<AppState>();
         let report = {
-            let mut m = state.monitor.lock().map_err(err)?;
+            let mut m = state.boost_monitor.lock().map_err(err)?;
             sweeplark_core::boost::apply(&mut m, &options, &never, None)
         };
         let freed = report.ram_before.saturating_sub(report.ram_after);
@@ -304,13 +313,27 @@ pub async fn app_uninstall(app: AppHandle, id: String) -> CmdResult<()> {
 
 /// Leftover folders of the app last uninstalled (only once it is really gone).
 #[tauri::command]
-pub async fn app_leftovers(app: AppHandle) -> CmdResult<Vec<String>> {
+pub async fn app_leftovers(app: AppHandle) -> CmdResult<Vec<sweeplark_core::apps::Leftover>> {
     blocking(move || {
         let a = app.state::<AppState>().last_uninstalled.lock().map_err(err)?.clone().ok_or("Uninstall an app first")?;
         if sweeplark_core::apps::still_installed(system_registry().as_ref(), &a.id) {
             return Err("The app is still installed. Finish its uninstaller first.".into());
         }
         Ok(sweeplark_core::apps::leftovers(&a))
+    })
+    .await
+}
+
+/// Send the chosen leftovers of the app last uninstalled to the Recycle Bin (only folders
+/// that were offered for it are accepted).
+#[tauri::command]
+pub async fn app_leftovers_remove(app: AppHandle, paths: Vec<String>) -> CmdResult<u32> {
+    blocking(move || {
+        let a = app.state::<AppState>().last_uninstalled.lock().map_err(err)?.clone().ok_or("Uninstall an app first")?;
+        if sweeplark_core::apps::still_installed(system_registry().as_ref(), &a.id) {
+            return Err("The app is still installed.".into());
+        }
+        crate::commands::logged("leftovers", sweeplark_core::apps::remove_leftovers(&a, &paths).map_err(err))
     })
     .await
 }

@@ -60,7 +60,14 @@
     clearTimeout(saveTimer);
     saveTimer = setTimeout(async () => {
       if (!s) return;
-      try { await saveSettings($state.snapshot(s) as Settings); toast(t("Settings saved", "Settings save ho gayi")); } catch (e) { toast(String(e), "warn"); }
+      try {
+        const saved = await saveSettings($state.snapshot(s) as Settings);
+        s.rev = saved.rev;
+        toast(t("Settings saved", "Settings save ho gayi"));
+      } catch (e) {
+        toast(e instanceof Error ? e.message : String(e), "warn");
+        if (ui.settings) s = structuredClone($state.snapshot(ui.settings) as Settings);
+      }
     }, 350);
   }
 
@@ -68,11 +75,15 @@
     try { await api.aiInstall(tier); progress = { stage: "model", tier, done: 0, total: 1, error: null }; }
     catch (e) { toast(String(e), "warn"); }
   }
+  let removing = $state<Tier | null>(null);
   async function remove(tier: Tier) {
-    await api.aiRemove(tier);
-    toast(t("Model removed", "Model hata diya"));
-    await loadAi();
-    s = structuredClone(await api.settings());
+    removing = null;
+    try {
+      await api.aiRemove(tier);
+      toast(t("Model removed", "Model hata diya"));
+      await loadAi();
+      s = structuredClone(await api.settings());
+    } catch (e) { toast(String(e), "warn"); }
   }
   function useModel(tier: Tier) {
     if (!s) return;
@@ -167,10 +178,10 @@
     <div class="setting"><div><strong>{t("Also when the disk is nearly full", "Disk bharne par bhi")}</strong><p class="muted small">{t("Starts a cleanup (with approval) when the system drive has less than 10% free.", "System drive 10% se kam khaali ho toh safai shuru (ijazat ke saath).")}</p></div>
       <Toggle bind:checked={s.agent.auto_clean.when_disk_low} onchange={save} label={t("Also when the disk is nearly full", "Disk bharne par bhi")} /></div>
     <div class="setting"><div><strong>{t("Daily report", "Daily report")}</strong><p class="muted small">{t("A short report of the day at this time.", "Roz is samay din ki chhoti report.")}</p></div>
-      <div class="row"><Toggle checked={s.agent.daily_summary !== null} onchange={(v) => { s!.agent.daily_summary = v ? "21:00" : null; save(); }} label={t("Daily report", "Daily report")} />
+      <div class="row"><Toggle controlled checked={s.agent.daily_summary !== null} onchange={(v) => { s!.agent.daily_summary = v ? "21:00" : null; save(); }} label={t("Daily report", "Daily report")} />
         {#if s.agent.daily_summary !== null}<input type="time" bind:value={s.agent.daily_summary} onchange={save} />{/if}</div></div>
     <div class="setting"><div><strong>{t("Weekly report", "Weekly report")}</strong><p class="muted small">{t("A summary of the whole week.", "Hafte bhar ka hisaab.")}</p></div>
-      <div class="row wrap"><Toggle checked={s.agent.weekly_summary !== null} onchange={(v) => { s!.agent.weekly_summary = v ? { weekday: 6, time: "20:00" } : null; save(); }} label={t("Weekly report", "Weekly report")} />
+      <div class="row wrap"><Toggle controlled checked={s.agent.weekly_summary !== null} onchange={(v) => { s!.agent.weekly_summary = v ? { weekday: 6, time: "20:00" } : null; save(); }} label={t("Weekly report", "Weekly report")} />
         {#if s.agent.weekly_summary}<select bind:value={s.agent.weekly_summary.weekday} onchange={save}>{#each DAYS as d, i}<option value={i}>{d}</option>{/each}</select>
           <input type="time" bind:value={s.agent.weekly_summary.time} onchange={save} />{/if}</div></div>
     <div class="setting"><div><strong>{t("Smart alerts", "Smart alerts")}</strong><p class="muted small">{t("Only for lasting problems: RAM full for 15 min, disk nearly full, a new startup app, protection off.", "Sirf lambi chalne wali dikkat par: RAM 15 min se bhari, disk lagbhag full, nayi startup app, suraksha band.")}</p></div>
@@ -225,7 +236,7 @@
                 <button class="btn ghost small" onclick={() => api.aiInstall(m.tier, true)}>{t("Stop", "Roko")}</button></div>
             {:else if m.installed}
               <div class="row">{#if !active}<button class="btn small primary" onclick={() => useModel(m.tier)}>{t("Use", "Use karein")}</button>{/if}
-                <button class="btn small ghost danger" onclick={() => remove(m.tier)}><Icon name="trash" size={15} />{t("Remove", "Hatao")}</button></div>
+                <button class="btn small ghost danger" onclick={() => (removing = m.tier)}><Icon name="trash" size={15} />{t("Remove", "Hatao")}</button></div>
             {:else}
               <button class="btn small" class:primary={ai.recommended === m.tier} onclick={() => install(m.tier)} disabled={!!downloading}><Icon name="download" size={15} />{t("Download", "Download")}</button>
             {/if}
@@ -276,16 +287,20 @@
   <p class="muted small about">{ui.info?.name ?? "Sweeplark"} {ui.info?.version} · {ui.info?.tagline} · {t("No ads, no account, no tracking.", "Na ads, na account, na tracking.")}</p>
 {/if}
 
-<Modal open={exportText !== null} title={t("Your settings", "Aapki settings")} wide>
+<Modal open={removing !== null} onclose={() => (removing = null)} title={t("Remove this AI model?", "Yeh AI model hatayein?")}>
+  <p class="muted">{t("It frees the disk space. You can download it again later.", "Disk ki jagah khaali hogi. Baad mein dobara download kar sakte hain.")}</p>
+  {#snippet footer()}<button class="btn" onclick={() => (removing = null)}>{t("Cancel", "Ruko")}</button><button class="btn primary" onclick={() => removing && remove(removing)}>{t("Remove", "Hatao")}</button>{/snippet}
+</Modal>
+<Modal open={exportText !== null} onclose={() => (exportText = null)} title={t("Your settings", "Aapki settings")} wide>
   <textarea readonly rows="12" class="mono">{exportText}</textarea>
   {#snippet footer()}<button class="btn" onclick={() => (exportText = null)}>{t("Close", "Band")}</button><button class="btn primary" onclick={() => exportText && copy(exportText)}><Icon name="copy" size={14} />{t("Copy", "Copy")}</button>{/snippet}
 </Modal>
-<Modal open={importText !== null} title={t("Import settings", "Settings import")} wide>
+<Modal open={importText !== null} onclose={() => (importText = null)} title={t("Import settings", "Settings import")} wide>
   <p class="muted small" style="margin-bottom:8px">{t("Paste the text you exported from Sweeplark.", "Sweeplark se export kiya text yahan paste karein.")}</p>
   <textarea rows="12" class="mono" bind:value={importText}></textarea>
   {#snippet footer()}<button class="btn" onclick={() => (importText = null)}>{t("Cancel", "Ruko")}</button><button class="btn primary" onclick={doImport} disabled={!importText?.trim()}>{t("Import", "Import")}</button>{/snippet}
 </Modal>
-<Modal open={report !== null} title={t("Report a problem", "Problem batayein")} wide>
+<Modal open={report !== null} onclose={() => (report = null)} title={t("Report a problem", "Problem batayein")} wide>
   <p class="muted small" style="margin-bottom:8px">{t("Write what happened under \"What happened\". You can edit everything.", "\"What happened\" ke neeche likhiye kya hua. Sab kuch badal sakte hain.")}</p>
   <textarea rows="14" class="mono" bind:value={report}></textarea>
   {#snippet footer()}<button class="btn" onclick={() => (report = null)}>{t("Cancel", "Ruko")}</button><button class="btn" onclick={() => report && copy(report)}><Icon name="copy" size={14} />{t("Copy", "Copy")}</button><button class="btn primary" onclick={sendReport}>{t("Open on GitHub", "GitHub par kholo")}</button>{/snippet}

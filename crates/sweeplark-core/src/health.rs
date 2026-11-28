@@ -51,6 +51,8 @@ const SYSTEM_PROCESSES: &[&str] = &[
     "taskhostw", "wudfhost", "conhost", "dllhost", "llama-server", "sweeplark", "kernel_task", "init", "systemd",
     "searchhost", "startmenuexperiencehost", "shellexperiencehost", "textinputhost", "lsm", "wmiprvse", "lockapp",
     "securityhealthsystray", "smartscreen", "sgrmbroker", "wlanext", "unsecapp", "dashost", "spoolsv",
+    "mpdefendercoreservice", "searchprotocolhost", "searchfilterhost", "backgroundtaskhost", "applicationframehost",
+    "systemsettingsbroker", "useroobebroker", "mousocoreworker", "tiworker", "trustedinstaller", "werfault",
 ];
 
 pub fn is_system_process(name: &str) -> bool {

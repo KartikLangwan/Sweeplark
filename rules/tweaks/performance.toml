@@ -140,6 +140,8 @@ name = "Turn off Sticky/Filter/Toggle Keys shortcuts"
 description = "Stops the pop-up when Shift is pressed five times, which often interrupts games."
 category = "performance"
 risk = "safe"
+note = "Shortcuts like pressing Shift five times (Sticky Keys) stop working."
+note_hi = "Shift paanch baar dabane jaise shortcuts (Sticky Keys) kaam nahi karenge."
 recommended = true
 [[tweak.registry]]
 key = 'HKCU\Control Panel\Accessibility\StickyKeys'

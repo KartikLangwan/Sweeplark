@@ -67,6 +67,11 @@ pub fn check(current: &str) -> Result<Option<UpdateInfo>> {
     if r.draft || r.prerelease || !is_newer(&r.tag_name, current) {
         return Ok(None);
     }
+    // The version ends up in a file name: digits and dots only.
+    let clean = r.tag_name.trim_start_matches(['v', 'V']);
+    if clean.is_empty() || !clean.chars().all(|c| c.is_ascii_digit() || c == '.') {
+        return Ok(None);
+    }
     let setup = r.assets.iter().find(|a| a.name.to_lowercase().ends_with("setup.exe"));
     Ok(Some(UpdateInfo {
         version: r.tag_name.trim_start_matches('v').to_string(),

@@ -48,7 +48,8 @@ pub fn plan(rules: &RuleSet, settings: &Settings, reg: &dyn RegistryBackend) -> 
         .filter(|c| c.risk == Risk::Safe && matches!(c.status, PreviewStatus::Ready))
         .map(|c| c.id.clone())
         .collect();
-    let auto_fix_bytes = scan.cleaners.iter().filter(|c| auto_fix_ids.contains(&c.id)).map(|c| c.bytes).sum();
+    // Files that look like the user's are never cleaned here, so they are not counted.
+    let auto_fix_bytes = scan.cleaners.iter().filter(|c| auto_fix_ids.contains(&c.id)).map(|c| c.bytes - c.flagged_bytes).sum();
     let startup_suggestions =
         startup.iter().filter(|i| i.enabled && i.advice == Advice::Disable).map(|i| i.id.clone()).collect();
     Ok(OptimizePlan { health, scan, startup, findings, auto_fix_ids, auto_fix_bytes, startup_suggestions })

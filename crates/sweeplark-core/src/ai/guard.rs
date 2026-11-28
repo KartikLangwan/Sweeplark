@@ -52,13 +52,36 @@ fn canonical(n: &str) -> String {
     if n.contains('.') { n.trim_end_matches('0').trim_end_matches('.').to_string() } else { n.to_string() }
 }
 
-/// Every number in the answer (except tiny list numbers) must appear in the facts.
+const UNITS: &[&str] = &["gb", "mb", "kb", "tb", "%", "°", "ghz", "mhz", "din", "day", "hour", "ghant", "min", "sec", "process", "app", "file", "core", "thread"];
+
+/// Small whole numbers (up to 10) that are *not* followed by a unit: counts and list
+/// numbers in normal sentences. "9 GB" or "5%" are measurements and must be grounded.
+fn harmless_small(answer_lower: &str, n: &str) -> bool {
+    if n.contains('.') || n.parse::<f64>().map(|v| v > 10.0).unwrap_or(true) {
+        return false;
+    }
+    let mut from = 0;
+    while let Some(i) = answer_lower[from..].find(n) {
+        let start = from + i;
+        let end = start + n.len();
+        let before_digit = answer_lower[..start].chars().next_back().is_some_and(|c| c.is_ascii_digit() || c == '.');
+        let after_digit = answer_lower[end..].chars().next().is_some_and(|c| c.is_ascii_digit() || c == '.');
+        if !before_digit && !after_digit {
+            let rest = answer_lower[end..].trim_start();
+            if UNITS.iter().any(|u| rest.starts_with(u)) {
+                return false;
+            }
+        }
+        from = end;
+    }
+    true
+}
+
+/// Every measured number in the answer must appear in the facts.
 pub fn numbers_grounded(answer: &str, facts: &str) -> bool {
     let known: std::collections::HashSet<String> = numbers(facts).iter().map(|n| canonical(n)).collect();
-    numbers(answer).iter().all(|n| {
-        let small = n.parse::<f64>().map(|v| v <= 10.0 && !n.contains('.')).unwrap_or(false);
-        small || known.contains(&canonical(n))
-    })
+    let lower = answer.to_lowercase();
+    numbers(answer).iter().all(|n| known.contains(&canonical(n)) || harmless_small(&lower, n))
 }
 
 /// Phrases where the assistant claims it already changed something. In chat it never acts,
@@ -105,9 +128,25 @@ const FORBIDDEN: &[&str] = &[
     "format your",
 ];
 
+/// Advice we never give, also when worded differently ("Defender ko band karein",
+/// "antivirus hata do", "registry saaf karo"): per sentence, a subject plus an action.
+const NEVER: &[(&[&str], &[&str])] = &[
+    (&["defender", "antivirus", "anti-virus", "firewall", "smartscreen"], &["band kar", "band karo", "band karein", "off kar", "turn off", "switch off", "disable", "hata", "remove", "uninstall", "bypass"]),
+    (&["registry"], &["clean", "saaf", "safai", "optimi", "fix kar"]),
+    (&["system32", "winsxs"], &["delete", "hata", "saaf", "clean", "remove"]),
+    (&["format"], &["drive", "disk", "pc", "windows", "c:"]),
+];
+
 pub fn has_forbidden_advice(answer: &str) -> bool {
     let a = answer.to_lowercase();
-    FORBIDDEN.iter().any(|f| a.contains(f))
+    if FORBIDDEN.iter().any(|f| a.contains(f)) {
+        return true;
+    }
+    a.split(['.', '!', '?', '\n', ';']).any(|sentence| {
+        NEVER.iter().any(|(subjects, actions)| {
+            subjects.iter().any(|s| sentence.contains(s)) && actions.iter().any(|x| sentence.contains(x))
+        })
+    })
 }
 
 /// Clean up and validate. `None` = do not show this answer.
@@ -127,6 +166,19 @@ pub fn check_chat(answer: &str, facts: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn grounding_and_advice_rules() {
+        let facts = "RAM 91% used (7.3 GB of 8.0 GB). 214 processes.";
+        assert!(numbers_grounded("RAM 91% bhari hai, 7.3 GB use ho rahi hai. 2 tabs band karein.", facts));
+        assert!(!numbers_grounded("RAM 91%, 9 GB use ho rahi hai", facts), "made-up measurement");
+        assert!(!numbers_grounded("Battery 5% hai", facts));
+        assert!(has_forbidden_advice("Defender ko band karein, PC tez hoga."));
+        assert!(has_forbidden_advice("Antivirus hata do."));
+        assert!(has_forbidden_advice("Registry saaf karo."));
+        assert!(!has_forbidden_advice("Defender chalu hai, sab theek hai."));
+        assert!(!has_forbidden_advice("Firewall off hai. Use Windows Security mein chalu karein."));
+    }
 
     #[test]
     fn strips_and_cuts() {

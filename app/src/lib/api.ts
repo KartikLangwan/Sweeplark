@@ -3,7 +3,7 @@
 
 import type {
   AiStatus, AppInfo, Approval, AssistantReply, ChatEvent, ChatTurn, CleanReport, ChangeRecord, Health, History,
-  Inbox, OptimizePlan, DuplicateReport, InstalledApp, AppUpdate, UpdateInfo, TweakState, LiveStats, ProcessGroup, StorageReport, ToolId, PowerPlan, BoostPlan, BoostOptions, BoostReport, OptimizeReport, ScanReport, Settings, StartupItem, Tier, InstallProgress,
+  Inbox, OptimizePlan, DuplicateReport, InstalledApp, AppUpdate, Leftover, UpdateInfo, TweakState, LiveStats, ProcessGroup, StorageReport, ToolId, PowerPlan, BoostPlan, BoostOptions, BoostReport, OptimizeReport, ScanReport, Settings, StartupItem, Tier, InstallProgress,
 } from "./types";
 
 export const inTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -36,7 +36,7 @@ export const api = {
   optimizePlan: () => call<OptimizePlan>("optimize_plan"),
   optimizeApply: () => call<OptimizeReport>("optimize_apply"),
   settings: () => call<Settings>("settings_get"),
-  saveSettings: (settings: Settings) => call<void>("settings_set", { settings }),
+  saveSettings: (settings: Settings) => call<Settings>("settings_set", { settings }),
   inbox: () => call<Inbox>("inbox_list"),
   markRead: (id: number | null) => call<void>("inbox_read", { id }),
   approvals: () => call<Approval[]>("approvals_list"),
@@ -73,7 +73,8 @@ export const api = {
   duplicates: (path?: string, minMb = 1) => call<DuplicateReport>("duplicates_find", { path: path ?? null, minMb }),
   apps: () => call<InstalledApp[]>("apps_list"),
   uninstall: (id: string) => call<void>("app_uninstall", { id }),
-  leftovers: () => call<string[]>("app_leftovers"),
+  leftovers: () => call<Leftover[]>("app_leftovers"),
+  removeLeftovers: (paths: string[]) => call<number>("app_leftovers_remove", { paths }),
   appUpdates: () => call<AppUpdate[]>("app_updates"),
   appUpdate: (id: string | null) => call<void>("app_update", { id }),
   settingsExport: () => call<string>("settings_export"),

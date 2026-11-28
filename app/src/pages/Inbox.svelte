@@ -94,7 +94,7 @@
         <div class="row actions">
           <button class="btn" onclick={() => decide(a, false)} disabled={busy === a.id}>{t("No, keep them", "Nahi, rehne do")}</button>
           <button class="btn primary" onclick={() => decide(a, true)} disabled={busy === a.id}>
-            {#if busy === a.id}<div class="spin" style="border-top-color:#fff"></div>{/if}{t("Yes, clean", "Haan, saaf karo")}</button>
+            {#if busy === a.id}<div class="spin" style="border-top-color:var(--on-primary)"></div>{/if}{t("Yes, clean", "Haan, saaf karo")}</button>
         </div>
       </div>
     {/each}

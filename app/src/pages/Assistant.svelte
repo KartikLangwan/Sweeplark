@@ -12,6 +12,7 @@
   let input = $state("");
   let status = $state<AiStatus | null>(null);
   let scroller: HTMLDivElement;
+  let inputEl = $state<HTMLInputElement | null>(null);
   const msgs = $derived(chat.msgs);
   const busy = $derived(chat.busy);
 
@@ -33,7 +34,9 @@
     if (!q.trim() || busy) return;
     input = "";
     await ask(q, scrollDown);
-    api.aiStatus().then((s) => (status = s));
+    await tick();
+    inputEl?.focus();
+    api.aiStatus().then((s) => (status = s)).catch(() => {});
   }
 </script>
 
@@ -85,7 +88,7 @@
   </div>
 
   <form class="composer card" onsubmit={(e) => { e.preventDefault(); send(); }}>
-    <input type="text" bind:value={input} placeholder={t("e.g. Why is my PC getting hot?", "Jaise: mera PC garam kyun ho raha hai?")} disabled={busy} aria-label={t("Question", "Sawaal")} />
+    <input type="text" bind:this={inputEl} bind:value={input} placeholder={t("e.g. Why is my PC getting hot?", "Jaise: mera PC garam kyun ho raha hai?")} disabled={busy} aria-label={t("Question", "Sawaal")} />
     <button class="btn primary" type="submit" disabled={busy || !input.trim()} aria-label={t("Send", "Bhejein")}><Icon name="send" size={18} /></button>
   </form>
 </div>
@@ -97,7 +100,7 @@
   .welcome { margin: auto; max-width: 560px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 12px; }
   .sugs { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 6px; }
   .bubble { padding: 11px 15px; border-radius: 16px; max-width: 78%; white-space: pre-wrap; line-height: 1.5; }
-  .bubble.user { align-self: flex-end; background: var(--teal); color: #fff; border-bottom-right-radius: 5px; }
+  .bubble.user { align-self: flex-end; background: var(--primary-bg); color: var(--on-primary); border-bottom-right-radius: 5px; }
   .bubble.bot { background: var(--surface-3); border-bottom-left-radius: 5px; max-width: 100%; }
   .ai { display: flex; gap: 10px; align-items: flex-start; max-width: 86%; }
   .avatar { flex: none; margin-top: 2px; }

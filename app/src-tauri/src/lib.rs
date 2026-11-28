@@ -38,6 +38,9 @@ pub struct AppState {
     pub update: Mutex<Option<sweeplark_core::update::UpdateInfo>>,
     pub tweaks: sweeplark_core::tweaks::TweakSet,
     pub monitor: Mutex<sweeplark_core::monitor::Monitor>,
+    /// Boost, Game mode and RAM guard have their own monitor: their slow steps (GPU sampling,
+    /// memory cleanup) never make the live stats or the tray wait.
+    pub boost_monitor: Mutex<sweeplark_core::monitor::Monitor>,
     /// PC facts for tweak conditions, read once.
     pub tweak_ctx: Mutex<Option<sweeplark_core::tweaks::TweakContext>>,
     /// A restore point was made (or tried) in this session.
@@ -76,6 +79,7 @@ impl AppState {
             update: Mutex::new(None),
             tweaks: sweeplark_core::tweaks::TweakSet::builtin(),
             monitor: Mutex::new(sweeplark_core::monitor::Monitor::new()),
+            boost_monitor: Mutex::new(sweeplark_core::monitor::Monitor::new()),
             tweak_ctx: Mutex::new(None),
             restore_point_done: AtomicBool::new(false),
             pending_page: Mutex::new(None),
@@ -96,10 +100,14 @@ pub fn show_main(app: &AppHandle, page: Option<&str>) {
         }
         return;
     }
-    if let (Some(p), Ok(mut g)) = (page, app.state::<AppState>().pending_page.lock()) {
-        *g = Some(p.to_string());
-    }
+    let set_pending = |p: Option<&str>| {
+        if let Ok(mut g) = app.state::<AppState>().pending_page.lock() {
+            *g = p.map(str::to_string);
+        }
+    };
+    set_pending(page);
     if !sweeplark_core::platform::system::webview2_installed() {
+        set_pending(None);
         sweeplark_core::log::error("WebView2 runtime missing");
         sweeplark_core::platform::system::message_box(
             "Sweeplark",
@@ -174,6 +182,16 @@ pub fn quit(app: &AppHandle) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let background = std::env::args().any(|a| a == "--background");
+    // Started by "Restart as administrator": wait (up to 10 s) for the old copy to close, so
+    // the single-instance check doesn't hand this start back to it.
+    if let Some(pid) = std::env::args().find_map(|a| a.strip_prefix("--wait-parent=").and_then(|p| p.parse::<u32>().ok())) {
+        for _ in 0..100 {
+            if !sweeplark_core::platform::system::process_alive(pid) {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    }
     // "--page=clean" (set by "Restart as administrator") opens that page.
     let start_page = std::env::args().find_map(|a| a.strip_prefix("--page=").map(str::to_string));
     std::panic::set_hook(Box::new(|info| {
@@ -259,6 +277,7 @@ pub fn run() {
             pc::apps_list,
             pc::app_uninstall,
             pc::app_leftovers,
+            pc::app_leftovers_remove,
             pc::app_updates,
             pc::app_update,
         ])

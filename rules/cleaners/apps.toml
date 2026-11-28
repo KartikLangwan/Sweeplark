@@ -74,10 +74,12 @@ path = "%LOCALAPPDATA%/Packages/MSTeams_8wekyb3d8bbwe/LocalCache/Microsoft/MSTea
 [[cleaner]]
 id = "spotify.cache"
 name = "Spotify cache"
-description = "Streamed songs Spotify keeps on disk. Downloaded (offline) songs stay safe."
-description_hi = "Spotify ke stream kiye gaane ki cache. Download kiye (offline) gaane safe rahenge."
+description = "Streamed songs Spotify keeps on disk."
+description_hi = "Spotify ke stream kiye gaane ki cache."
 category = "apps"
-risk = "safe"
+risk = "ask"
+note = "If you saved songs for offline listening, Spotify may download them again."
+note_hi = "Agar gaane offline ke liye save kiye hain, Spotify unhe dobara download kar sakta hai."
 running = ["spotify.exe"]
 [[cleaner.target]]
 path = "%LOCALAPPDATA%/Spotify/Data"

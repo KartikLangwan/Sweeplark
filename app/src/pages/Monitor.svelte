@@ -182,10 +182,10 @@
   </div>
 {/if}
 
-<Modal open={ending !== null} title={t("End this app?", "Yeh app band karein?")}>
+<Modal open={ending !== null} onclose={() => (ending = null)} title={t("End this app?", "Yeh app band karein?")}>
   {#if ending}<p><strong>{ending.name}</strong> · {ending.pids.length} {t("processes", "process")}</p>
     <p class="muted small" style="margin-top:6px">{t("Unsaved work in it will be lost. Prefer closing it normally if you can.", "Isme unsaved kaam chala jayega. Ho sake toh normal tareeke se band karein.")}</p>{/if}
-  {#snippet footer()}<button class="btn" onclick={() => (ending = null)}>{t("Cancel", "Ruko")}</button><button class="btn primary danger" onclick={() => ending && end(ending)}>{t("End app", "Band karo")}</button>{/snippet}
+  {#snippet footer()}<button class="btn" onclick={() => (ending = null)}>{t("Cancel", "Ruko")}</button><button class="btn solid-danger" onclick={() => ending && end(ending)}>{t("End app", "Band karo")}</button>{/snippet}
 </Modal>
 
 <style>

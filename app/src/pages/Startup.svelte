@@ -16,7 +16,8 @@
 
   onMount(load);
   async function load() {
-    items = await api.startupList();
+    try { items = await api.startupList(); }
+    catch (e) { toast(String(e), "warn"); items = []; }
   }
 
   const on = $derived(items?.filter((i) => i.enabled).length ?? 0);
@@ -105,7 +106,7 @@
           <code class="selectable" title={item.command}>{item.command}</code>
         </div>
         {#if busy === item.id}<div class="spin"></div>{/if}
-        <Toggle checked={item.enabled} label={item.name} disabled={busy !== null || (item.needs_admin && !ui.info?.is_admin)}
+        <Toggle controlled checked={item.enabled} label={item.name} disabled={busy !== null || (item.needs_admin && !ui.info?.is_admin)}
           onchange={(v) => set(item, v)} />
       </div>
     {:else}

@@ -13,6 +13,7 @@
   type Tab = TweakCategory | "recommended";
 
   let tweaks = $state<TweakState[] | null>(null);
+  let loadError = $state(false);
   let tab = $state<Tab>("recommended");
   let busy = $state<string | null>(null);
   let query = $state("");
@@ -50,7 +51,8 @@
 
   onMount(load);
   async function load() {
-    try { tweaks = await api.tweaks(); } catch (e) { toast(String(e), "warn"); tweaks = []; }
+    loadError = false;
+    try { tweaks = await api.tweaks(); } catch (e) { toast(String(e), "warn"); loadError = true; }
   }
 
   const maxRisk = $derived(ui.settings?.trust_level ?? "ask");
@@ -75,7 +77,8 @@
     return out;
   });
 
-  const todo = $derived((tweaks ?? []).filter((tw) => tw.recommended && tw.available && !tw.applied && allowed(tw.risk)));
+  // Tweaks that need admin can't be applied without it: they are not offered in "Apply recommended".
+  const todo = $derived((tweaks ?? []).filter((tw) => tw.recommended && tw.available && !tw.applied && allowed(tw.risk) && !(tw.needs_admin && !ui.info?.is_admin)));
   const appliedCount = $derived((tweaks ?? []).filter((tw) => tw.applied).length);
   const needsAdmin = $derived(todo.some((tw) => tw.needs_admin) && !ui.info?.is_admin);
   // Not running as admin (only when the app actually reports that).
@@ -136,7 +139,7 @@
 <JobProgress id="tweaks" hint={t("Changing Windows settings one by one…", "Windows settings ek-ek karke badal raha hoon…")} />
 
 {#if tweaks}
-  <AdminBanner count={adminWaiting} text={t("Restart Sweeplark as administrator to apply these. You come back to this page; nothing is lost.", "Inhe lagane ke liye Sweeplark ko admin mode mein kholein. Aap isi page par wapas aayenge; kuch nahi khoyega.")} />
+  <AdminBanner count={adminWaiting} text={t("Restart Sweeplark as administrator to apply these. You come back to this page; your settings and history are kept.", "Inhe lagane ke liye Sweeplark ko admin mode mein kholein. Aap isi page par wapas aayenge; settings aur history rahegi.")} />
 
   <section class="card hero">
     <div class="col hero-text">
@@ -145,7 +148,7 @@
         {#if needsAdmin}{t(" Some need administrator rights.", " Kuch ke liye admin chahiye.")}{/if}</p>
     </div>
     <button class="btn primary" disabled={!todo.length || applying} onclick={() => (confirm = true)}>
-      {#if applying}<div class="spin" style="border-top-color:#fff"></div>{:else}<Icon name="sparkle" size={17} />{/if}{t("Apply recommended", "Recommended lagao")}</button>
+      {#if applying}<div class="spin" style="border-top-color:var(--on-primary)"></div>{:else}<Icon name="sparkle" size={17} />{/if}{t("Apply recommended", "Recommended lagao")}</button>
   </section>
 
   <nav class="tabs" aria-label={t("Categories", "Categories")}>
@@ -170,13 +173,15 @@
           {#if tw.note}<span class="note small"><Icon name="alert" size={13} />{tw.note}</span>{/if}
         </div>
         {#if busy === tw.id}<div class="spin"></div>{/if}
-        <Toggle checked={tw.applied} label={tw.name} disabled={!tw.available || busy !== null || blocked(tw)} onchange={(v) => toggle(tw, v)} />
+        <Toggle controlled checked={tw.applied} label={tw.name} disabled={!tw.available || busy !== null || blocked(tw)} onchange={(v) => toggle(tw, v)} />
       </div>
     {:else}
       <div class="empty">{t("Nothing here for your trust level. Change it in Settings to see more.", "Aapke trust level par yahan kuch nahi. Settings mein badal kar aur dekhein.")}</div>
     {/each}
   </div>
   <p class="muted small credit">{t("Tweak values follow Microsoft documentation and the open-source optimizerDuck project.", "Tweak values Microsoft docs aur open-source optimizerDuck project par aadharit hain.")}</p>
+{:else if loadError}
+  <div class="card row"><Icon name="alert" /><span class="grow">{t("Could not read the Windows settings.", "Windows settings padh nahi paya.")}</span><button class="btn small" onclick={load}>{t("Try again", "Dobara try")}</button></div>
 {:else}
   <div class="row"><div class="spin"></div><span class="muted">{t("Reading Windows settings…", "Windows settings padh raha hoon…")}</span></div>
 {/if}
@@ -201,7 +206,7 @@
   .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
   .tabs button { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); cursor: pointer; font-weight: 520; }
   .tabs button:hover { background: var(--surface-3); }
-  .tabs button.on { background: var(--teal); border-color: var(--teal); color: #fff; }
+  .tabs button.on { background: var(--primary-bg); border-color: var(--primary-bg); color: var(--on-primary); }
   .tabs em { font-style: normal; font-size: 11px; font-weight: 600; opacity: .8; padding-left: 4px; border-left: 1px solid currentColor; line-height: 12px; }
   .tabs button:not(.on) em { opacity: .6; }
   .hint { margin: 0 4px 12px; }
