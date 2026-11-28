@@ -40,6 +40,12 @@ pub enum SuggestedAction {
     OpenWindowsSecurity,
     CloseApps { apps: Vec<String> },
     Backup,
+    /// Open Boost (free RAM, calm background apps).
+    Boost,
+    /// Open the Optimizer on its recommended tweaks.
+    Optimize,
+    /// Open the Apps page (uninstall, updates).
+    Apps,
 }
 
 #[derive(Debug, Clone, Serialize)]

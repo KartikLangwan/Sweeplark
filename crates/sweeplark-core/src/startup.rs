@@ -29,6 +29,8 @@ pub enum StartupSource {
     FolderUser,
     /// Startup folder for all users
     FolderCommon,
+    /// Task Scheduler task that runs at log-on or boot (not Microsoft's own tasks)
+    Task,
 }
 
 impl StartupSource {
@@ -39,6 +41,7 @@ impl StartupSource {
             StartupSource::RunMachine32 => "run-machine32",
             StartupSource::FolderUser => "folder-user",
             StartupSource::FolderCommon => "folder-common",
+            StartupSource::Task => "task",
         }
     }
 
@@ -50,11 +53,13 @@ impl StartupSource {
             StartupSource::RunMachine32 => (Hive::LocalMachine, format!(r"{APPROVED}\Run32")),
             StartupSource::FolderUser => (Hive::CurrentUser, format!(r"{APPROVED}\StartupFolder")),
             StartupSource::FolderCommon => (Hive::LocalMachine, format!(r"{APPROVED}\StartupFolder")),
+            // Tasks keep their state in Task Scheduler, not in the registry.
+            StartupSource::Task => (Hive::CurrentUser, String::new()),
         }
     }
 
     pub fn needs_admin(self) -> bool {
-        self.approved_key().0.needs_admin_to_write()
+        self != StartupSource::Task && self.approved_key().0.needs_admin_to_write()
     }
 
     pub fn label(self, lang: Lang) -> &'static str {
@@ -63,6 +68,7 @@ impl StartupSource {
             StartupSource::RunMachine | StartupSource::RunMachine32 => lang.pick("Registry (all users)", "Registry (sab users)"),
             StartupSource::FolderUser => lang.pick("Startup folder (only you)", "Startup folder (sirf aap)"),
             StartupSource::FolderCommon => lang.pick("Startup folder (all users)", "Startup folder (sab users)"),
+            StartupSource::Task => lang.pick("Scheduled task (at sign-in)", "Scheduled task (sign-in par)"),
         }
     }
 }
@@ -240,6 +246,59 @@ pub fn list(reg: &dyn RegistryBackend, folders: &StartupFolders, known: &KnownAp
     Ok(items)
 }
 
+/// Parse the JSON list of log-on/boot tasks written by PowerShell (one object or an array).
+fn parse_tasks(json: &str, known: &KnownApps) -> Vec<StartupItem> {
+    let v: serde_json::Value = serde_json::from_str(json.trim()).unwrap_or(serde_json::Value::Null);
+    let list = match v {
+        serde_json::Value::Array(a) => a,
+        serde_json::Value::Object(_) => vec![v],
+        _ => Vec::new(),
+    };
+    let mut out = Vec::new();
+    for t in list {
+        let (Some(path), Some(name)) = (t["path"].as_str(), t["name"].as_str()) else { continue };
+        let command = [t["exe"].as_str().unwrap_or(""), t["args"].as_str().unwrap_or("")].join(" ").trim().to_string();
+        let (advice, advice_note) = known.advise(name, &command);
+        out.push(StartupItem {
+            id: format!("task:{path}"),
+            name: name.to_string(),
+            command,
+            source: StartupSource::Task,
+            source_label: StartupSource::Task.label(known.lang).into(),
+            // "Disabled" is the enum name, the same in every Windows language.
+            enabled: !t["state"].as_str().unwrap_or("").eq_ignore_ascii_case("disabled"),
+            needs_admin: false,
+            advice,
+            advice_note,
+            approved_name: path.to_string(),
+        });
+    }
+    out
+}
+
+/// Third-party scheduled tasks that start at sign-in or boot (updaters, launchers ...).
+/// Slower than [`list`] (asks PowerShell), so it is only used by the Startup page.
+pub fn logon_tasks(known: &KnownApps) -> Vec<StartupItem> {
+    if !cfg!(windows) {
+        return Vec::new();
+    }
+    let script = "[Console]::OutputEncoding=[Text.Encoding]::UTF8; \
+        Get-ScheduledTask | Where-Object { $_.TaskPath -notlike '\\Microsoft\\*' -and ($_.Triggers | Where-Object { $_.CimClass.CimClassName -in 'MSFT_TaskLogonTrigger','MSFT_TaskBootTrigger' }) } | \
+        ForEach-Object { $a = $_.Actions | Select-Object -First 1; [pscustomobject]@{ path = $_.TaskPath + $_.TaskName; name = $_.TaskName; state = [string]$_.State; exe = [string]$a.Execute; args = [string]$a.Arguments } } | \
+        ConvertTo-Json -Compress";
+    match crate::platform::ops::run("powershell", &["-NoProfile", "-NonInteractive", "-Command", script]) {
+        Ok(out) if out.status.success() => parse_tasks(&String::from_utf8_lossy(&out.stdout), known),
+        Ok(out) => {
+            crate::log::warn(&format!("listing startup tasks failed: {}", String::from_utf8_lossy(&out.stderr).trim()));
+            Vec::new()
+        }
+        Err(e) => {
+            crate::log::warn(&format!("listing startup tasks failed: {e}"));
+            Vec::new()
+        }
+    }
+}
+
 /// Switch an entry on or off. Returns the steps that undo it.
 pub fn set_enabled(
     reg: &dyn RegistryBackend,
@@ -247,6 +306,10 @@ pub fn set_enabled(
     enabled: bool,
     is_admin: bool,
 ) -> Result<Vec<RevertStep>> {
+    if item.source == StartupSource::Task {
+        crate::platform::ops::set_task(&item.approved_name, enabled)?;
+        return Ok(vec![RevertStep::ScheduledTask { path: item.approved_name.clone(), enabled: !enabled }]);
+    }
     if item.needs_admin && !is_admin {
         return Err(Error::NeedsAdmin(format!("'{}' is set up for all users", item.name)));
     }
@@ -351,6 +414,21 @@ mod tests {
         let tool = items.iter().find(|i| i.name == "OldTool").unwrap();
         assert!(matches!(set_enabled(&reg, tool, false, false), Err(Error::NeedsAdmin(_))));
         assert!(set_enabled(&reg, tool, false, true).is_ok());
+    }
+
+    #[test]
+    fn parses_task_json() {
+        let known = KnownApps::builtin();
+        let one = r#"{"path":"\\GoogleUpdateTaskMachineCore","name":"GoogleUpdateTaskMachineCore","state":"Ready","exe":"C:\\g.exe","args":"/c"}"#;
+        let items = parse_tasks(one, &known);
+        assert_eq!(items.len(), 1);
+        assert!(items[0].enabled);
+        assert_eq!(items[0].id, r"task:\GoogleUpdateTaskMachineCore");
+        let two = r#"[{"path":"\\A","name":"A","state":"Disabled","exe":"a.exe","args":""},{"path":"\\B","name":"B","state":"Ready","exe":"b.exe","args":null}]"#;
+        let items = parse_tasks(two, &known);
+        assert_eq!(items.len(), 2);
+        assert!(!items[0].enabled && items[1].enabled);
+        assert!(parse_tasks("", &known).is_empty());
     }
 
     #[test]

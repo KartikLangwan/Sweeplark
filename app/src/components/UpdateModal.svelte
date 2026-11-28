@@ -16,7 +16,9 @@
     api.updateCheck(false).then((u) => { if (u) { info = u; open = true; } }).catch(() => {});
     const a = on<UpdateInfo>("update-available", (u) => { info = u; open = true; });
     const b = on<[number, number]>("update-progress", (p) => (progress = p));
-    return () => { a.then((f) => f()); b.then((f) => f()); };
+    const local = (e: Event) => { info = (e as CustomEvent<UpdateInfo>).detail; open = true; };
+    window.addEventListener("sweeplark-update", local);
+    return () => { a.then((f) => f()); b.then((f) => f()); window.removeEventListener("sweeplark-update", local); };
   });
 
   async function install() {

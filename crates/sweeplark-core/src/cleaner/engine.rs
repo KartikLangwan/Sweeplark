@@ -428,9 +428,23 @@ pub fn scan_cleaner(def: &CleanerDef, ctx: &ScanContext) -> CleanerPreview {
 
 /// Preview every wanted cleaner. Changes nothing on disk.
 pub fn scan(rules: &RuleSet, ctx: &ScanContext, opts: &ScanOptions) -> ScanReport {
+    scan_with(rules, ctx, opts, &mut |_, _, _| {})
+}
+
+/// [`scan`] with progress: (cleaners done, cleaners total, name of the one being looked at).
+pub fn scan_with(rules: &RuleSet, ctx: &ScanContext, opts: &ScanOptions, progress: &mut dyn FnMut(u64, u64, &str)) -> ScanReport {
     let started = Instant::now();
-    let cleaners: Vec<CleanerPreview> =
-        rules.for_os(&ctx.os).filter(|d| wanted(d, opts)).map(|d| scan_cleaner(d, ctx)).collect();
+    let defs: Vec<&CleanerDef> = rules.for_os(&ctx.os).filter(|d| wanted(d, opts)).collect();
+    let n = defs.len() as u64;
+    let cleaners: Vec<CleanerPreview> = defs
+        .into_iter()
+        .enumerate()
+        .map(|(i, d)| {
+            progress(i as u64, n, ctx.lang.pick_opt(&d.name, d.name_hi.as_deref()));
+            scan_cleaner(d, ctx)
+        })
+        .collect();
+    progress(n, n, "");
     ScanReport {
         total_files: cleaners.iter().filter(|c| matches!(c.status, PreviewStatus::Ready)).map(|c| c.files).sum(),
         total_bytes: cleaners.iter().filter(|c| matches!(c.status, PreviewStatus::Ready)).map(|c| c.bytes).sum(),
@@ -451,6 +465,8 @@ pub struct CleanOutcome {
     pub changed: u64,
     /// Looked like the user's own files and were not approved; left alone.
     pub kept_for_approval: u64,
+    /// Approved files of the user that went to the Recycle Bin (can be restored).
+    pub recycled: u64,
     pub skipped_reason: Option<String>,
     pub errors: Vec<String>,
 }
@@ -510,6 +526,18 @@ fn delete_entry(e: &PlannedEntry, guard: &SafetyGuard) -> DeleteResult {
         EntryKind::File => {
             if meta.len() != e.size || (e.modified.is_some() && meta.modified().ok() != e.modified) {
                 return DeleteResult::Changed;
+            }
+            // Files that look like the user's own (approved one by one) go to the Recycle Bin,
+            // so a wrong tick can be undone. Junk is deleted for good.
+            if e.class != FileClass::Junk && crate::platform::system::has_recycle_bin(&e.path) {
+                return match crate::platform::system::to_recycle_bin(&e.path) {
+                    Ok(()) => DeleteResult::Deleted(e.size),
+                    Err(err) => DeleteResult::Error(format!("{}: {err}", e.path.display())),
+                };
+            }
+            if e.class != FileClass::Junk && cfg!(windows) {
+                // No Recycle Bin on this drive (USB, network): never delete the user's file for good.
+                return DeleteResult::Error(format!("{}: no Recycle Bin on this drive, left alone", e.path.display()));
             }
             match remove_file_clearing_readonly(&e.path) {
                 Ok(()) => DeleteResult::Deleted(e.size),
@@ -599,6 +627,9 @@ pub fn clean(
             }
             match delete_entry(entry, guard) {
                 DeleteResult::Deleted(bytes) => {
+                    if entry.class != FileClass::Junk {
+                        outcome.recycled += 1;
+                    }
                     outcome.deleted_files += 1;
                     outcome.freed_bytes += bytes;
                 }

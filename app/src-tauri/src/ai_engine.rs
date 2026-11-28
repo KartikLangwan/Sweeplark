@@ -2,7 +2,7 @@
 
 use std::path::Path;
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
@@ -33,6 +33,8 @@ pub struct AiEngine {
     loaded: Mutex<Option<Loaded>>,
     pub progress: Mutex<Option<InstallProgress>>,
     pub cancel: AtomicBool,
+    /// Engine process id while one runs (0 = none), readable without the lock.
+    running_pid: AtomicU32,
 }
 
 impl AiEngine {
@@ -43,6 +45,7 @@ impl AiEngine {
             loaded: Mutex::new(None),
             progress: Mutex::new(None),
             cancel: AtomicBool::new(false),
+            running_pid: AtomicU32::new(0),
         }
     }
 
@@ -89,6 +92,7 @@ impl AiEngine {
                 }
                 Err(e) => return Err(e.to_string()),
             };
+            self.running_pid.store(server.pid(), Ordering::Relaxed);
             *guard = Some(Loaded { server, tier: spec.tier, last_used: Instant::now() });
         }
         let loaded = guard.as_mut().expect("just loaded");
@@ -97,9 +101,21 @@ impl AiEngine {
         Ok(out)
     }
 
+    /// Stop the engine. Never waits behind a running answer or a model that is still
+    /// loading: if the lock is busy, the engine process is ended directly (the answer then
+    /// fails fast and the slot is cleaned up by its owner).
     pub fn unload(&self) {
-        if let Ok(mut g) = self.loaded.lock() {
-            *g = None;
+        match self.loaded.try_lock() {
+            Ok(mut g) => {
+                *g = None;
+                self.running_pid.store(0, Ordering::Relaxed);
+            }
+            Err(_) => {
+                let pid = self.running_pid.swap(0, Ordering::Relaxed);
+                if pid != 0 {
+                    sweeplark_core::platform::system::kill_pid(pid);
+                }
+            }
         }
     }
 
@@ -109,6 +125,7 @@ impl AiEngine {
             && g.as_ref().is_some_and(|l| l.last_used.elapsed() >= idle)
         {
             *g = None;
+            self.running_pid.store(0, Ordering::Relaxed);
         }
     }
 

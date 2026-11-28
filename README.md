@@ -9,7 +9,7 @@
 
 <p align="center">
   <img alt="Windows 10/11" src="https://img.shields.io/badge/Windows-10%20%7C%2011-0FB5AE">
-  <img alt="Version" src="https://img.shields.io/badge/version-1.4-0B1B33">
+  <img alt="Version" src="https://img.shields.io/badge/version-1.4.1-0B1B33">
   <img alt="Offline" src="https://img.shields.io/badge/AI-100%25%20offline-7DE8C8">
   <img alt="License" src="https://img.shields.io/badge/license-GPL--3.0-5B6B80">
 </p>
@@ -23,7 +23,7 @@ Get the latest version from **[Releases](../../releases)**:
 | File | For |
 |---|---|
 | `Sweeplark-x.y.z-Setup.exe` | **Recommended.** ~4 MB installer, no admin needed. Starts with Windows in the tray. Data in `%LOCALAPPDATA%\Sweeplark`, settings in `%APPDATA%\Sweeplark`. |
-| `Sweeplark-x.y.z-Portable.exe` | Single exe, no install. Keeps everything in a `SweeplarkData` folder next to it. |
+| `Sweeplark-x.y.z-Portable.exe` | Single exe, no install. Keeps everything in a `SweeplarkData` folder next to it. Needs the Microsoft Edge WebView2 Runtime (built into Windows 11). |
 
 The app checks GitHub for new versions at startup and asks before updating.
 Not code-signed yet: if SmartScreen appears, click **More info → Run anyway**.
@@ -32,28 +32,33 @@ Not code-signed yet: if SmartScreen appears, click **More info → Run anyway**.
 
 | | |
 |---|---|
-| 🪶 **Light** | ~8 MB app, Rust core, no background services. The monitor samples every few minutes at ~0% CPU. |
+| 🪶 **Light** | ~8 MB app, Rust core, no background services. Closing the window frees its memory; the tray reads stats only while you hover it. |
 | 🛡️ **Safe by design** | Preview before every action, personal folders are never touched, files that look like *your* data always need your tick. |
 | 🧾 **Honest** | Every change goes into a ledger. Startup changes can be undone. No fake "RAM boost", no registry cleaner. |
 | 🤖 **Offline AI** | A small local model (Lite / Balanced / High) explains your PC, writes daily reports and double-checks unclear files. Loaded only for seconds, then unloaded. |
 | 🌐 **English & Hinglish** | English by default; Hinglish can be picked in Settings. |
 | 🚫 **No tracking** | No ads, no account, no telemetry. |
 
-## Features (v1.4)
+## Features (v1.4.1)
 
-- **Optimizer** — 100+ Windows tweaks with one-click *Apply recommended* and an off switch for every one: performance (background apps, foreground priority, multimedia scheduler, startup delay, NTFS), gaming (Game Mode, Game DVR, mouse acceleration, HAGS, fullscreen/windowed optimizations, MPO, network throttling), GPU driver tweaks for NVIDIA / AMD / Intel, power (Fast Startup, hibernation, Ultimate Performance), privacy (telemetry + services + tasks, ads, tips, activity history, location, Cortana/Bing search), Windows AI (Recall, Click to Do, Copilot, Edge/Paint/Notepad AI), services (legacy, Edge background, indexing, SysMain, printing, Xbox, Bluetooth, sharing, Remote Desktop) and Explorer / taskbar / system settings.
-- **Boost** — one click, you choose: free RAM from background apps (working-set trim), clear standby memory (admin, like RAMMap), put CPU- and GPU-heavy background apps into Efficiency mode, switch to a high-performance plan. The app in front is never touched.
+What changed in each version: see [CHANGELOG.md](CHANGELOG.md).
+
+- **Boost** — one click, you choose: free RAM from background apps, deep RAM clean (admin: modified + standby lists, like RAMMap), Efficiency mode for CPU/GPU-heavy background apps, fastest power plan. The app you were using, voice chat, streaming, anti-cheat, security tools and your own "never touch" list are left alone. **Put back** undoes it.
+- **Game mode & RAM guard** (optional) — calm background apps while a game is full screen; free RAM by itself when memory stays nearly full.
+- **Optimizer** — 100+ Windows tweaks with one-click *Apply recommended*, an off switch for every one, and a restore point first: performance, gaming, GPU driver tweaks for NVIDIA / AMD / Intel, power, privacy, Windows AI (Recall, Copilot, Edge/Paint/Notepad AI), services, Explorer, taskbar and system.
 - **One-Click Optimize** — scan junk, startup, storage, health and security; fix only the safe part; report what changed.
-- **Cleaner** — 40+ rules for Windows, browsers, apps, games, GPU shader caches and developer tools, with an approval gate for anything that looks like your files.
-- **Monitor** — live CPU (per core, clock, temperature), GPU usage / VRAM (all vendors) and temperature (NVIDIA), memory, network and disk speed; process list with End and Eco (Efficiency mode).
-- **Storage analyzer** — biggest folders and files and space by file type; remove to the Recycle Bin.
-- **Startup manager** — Task Manager-style on/off with advice and undo.
+- **Cleaner** — 45+ rules for Windows, browsers, apps, games, GPU shader caches and developer tools, with an approval gate for anything that looks like your files (those go to the Recycle Bin).
+- **Storage** — biggest folders and files, space by file type, and an exact **duplicate finder**; removing always goes to the Recycle Bin.
+- **Apps** — uninstall programs and clean their leftover folders; app updates through winget.
+- **Monitor** — live CPU (per core, clock), GPU usage / VRAM (all vendors) and temperature (NVIDIA), memory, network and disk speed; process list with Eco and End (asks first). CPU temperature is read from LibreHardwareMonitor when it runs (Windows has no reliable API of its own).
+- **Startup manager** — Run keys, Startup folders and sign-in scheduled tasks; on/off with advice and undo.
 - **Health** — disks and disk health, battery wear, Defender and firewall status.
-- **Tools** — SFC, DISM, disk check, Windows Update repair, Explorer restart, icon cache rebuild, DNS flush, network reset, power plans, shutdown timer, hardware details (motherboard, BIOS, RAM sticks, GPU driver) and shortcuts to Windows tools.
-- **Tray** — starts with Windows; hover shows CPU/GPU usage and temperature, RAM and free disk.
+- **Tools** — SFC, DISM, update cleanup, disk check, Windows Update repair, restore point, Explorer restart, icon cache rebuild, DNS flush, network reset, power plans, shutdown timer, hardware details and shortcuts to Windows tools.
+- **Background jobs** — long tasks keep running when you switch pages, with progress, time left and tips.
+- **Tray** — starts with Windows; hover shows CPU/GPU usage and temperature, RAM and free disk; quick Boost.
 - **Background agent** — smart alerts, scheduled auto-clean with approval, daily and weekly reports.
-- **Offline AI assistant** — answers from measured facts; three model sizes.
-- **Updates** — checks GitHub Releases at startup and asks before updating.
+- **Offline AI assistant** — answers from measured facts (performance, graphics, background apps, storage, startup, Optimizer, installed apps, security) and offers buttons to act; three model sizes.
+- **Updates** — checks GitHub Releases at startup and asks before updating. **Report a problem** opens a prefilled GitHub issue.
 
 ## How the approval gate works
 

@@ -179,11 +179,58 @@ impl ServerOptions {
     }
 }
 
+/// Put the engine in a Windows job that ends it when Sweeplark ends, even if Sweeplark
+/// crashes or is closed while a model is still loading. No leftover engine eating RAM.
+#[cfg(windows)]
+fn tie_to_app(child: &Child) {
+    use std::os::windows::io::AsRawHandle;
+    use std::sync::OnceLock;
+    use windows::Win32::Foundation::HANDLE;
+    use windows::Win32::System::JobObjects::{
+        AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+        JobObjectExtendedLimitInformation, SetInformationJobObject,
+    };
+    static JOB: OnceLock<usize> = OnceLock::new();
+    let job = *JOB.get_or_init(|| unsafe {
+        let Ok(job) = CreateJobObjectW(None, windows::core::PCWSTR::null()) else { return 0 };
+        let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        let _ = SetInformationJobObject(
+            job,
+            JobObjectExtendedLimitInformation,
+            (&info as *const JOBOBJECT_EXTENDED_LIMIT_INFORMATION).cast(),
+            std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+        );
+        job.0 as usize // kept open for the life of the app on purpose
+    });
+    if job != 0 {
+        unsafe {
+            let _ = AssignProcessToJobObject(HANDLE(job as *mut _), HANDLE(child.as_raw_handle()));
+        }
+    }
+}
+
+#[cfg(not(windows))]
+fn tie_to_app(_child: &Child) {}
+
 /// A running model. Killed (and its memory freed) on drop.
 pub struct ModelServer {
     child: Child,
     pub client: LlamaClient,
 }
+
+/// A random-enough key for one engine run (not stored anywhere).
+fn session_key() -> String {
+    use sha2::{Digest, Sha256};
+    let seed = format!(
+        "{:?}{}{:p}",
+        std::time::SystemTime::now(),
+        std::process::id(),
+        &SEED_MARKER as *const u8
+    );
+    Sha256::digest(seed.as_bytes()).iter().take(16).map(|b| format!("{b:02x}")).collect()
+}
+static SEED_MARKER: u8 = 0;
 
 fn free_port() -> Result<u16> {
     Ok(TcpListener::bind("127.0.0.1:0")?.local_addr()?.port())
@@ -192,6 +239,7 @@ fn free_port() -> Result<u16> {
 impl ModelServer {
     pub fn start(exe: &Path, model: &Path, opts: &ServerOptions) -> Result<Self> {
         let port = free_port()?;
+        let key = session_key();
         // Leave a core for the user so the PC stays responsive.
         let threads = opts.threads.unwrap_or_else(|| {
             std::thread::available_parallelism().map(|n| n.get().saturating_sub(1).clamp(1, 8)).unwrap_or(2)
@@ -204,6 +252,7 @@ impl ModelServer {
             .args(["--n-gpu-layers", &opts.gpu_layers.to_string()])
             .args(["--threads", &threads.to_string()])
             .args(["--parallel", "1", "--no-webui", "--jinja"])
+            .args(["--api-key", &key])
             .args(["--reasoning-budget", "0"])
             .stdin(Stdio::null())
             .stdout(Stdio::null())
@@ -219,7 +268,8 @@ impl ModelServer {
             cmd.creation_flags(CREATE_NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS);
         }
         let child = cmd.spawn().map_err(|e| Error::Other(format!("could not start the AI engine: {e}")))?;
-        let mut server = ModelServer { child, client: LlamaClient::new(port) };
+        tie_to_app(&child);
+        let mut server = ModelServer { child, client: LlamaClient::with_key(port, Some(key)) };
         let started = Instant::now();
         loop {
             if let Ok(Some(status)) = server.child.try_wait() {
@@ -233,6 +283,11 @@ impl ModelServer {
             }
             std::thread::sleep(Duration::from_millis(250));
         }
+    }
+
+    /// Process id of the engine (to stop it without waiting for a running answer).
+    pub fn pid(&self) -> u32 {
+        self.child.id()
     }
 
     pub fn is_running(&mut self) -> bool {

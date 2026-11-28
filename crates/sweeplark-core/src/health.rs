@@ -49,6 +49,8 @@ const SYSTEM_PROCESSES: &[&str] = &[
     "winlogon", "services", "lsass", "lsaiso", "svchost", "dwm", "explorer", "sihost", "fontdrvhost", "ctfmon",
     "msmpeng", "nissrv", "securityhealthservice", "audiodg", "spoolsv", "searchindexer", "runtimebroker",
     "taskhostw", "wudfhost", "conhost", "dllhost", "llama-server", "sweeplark", "kernel_task", "init", "systemd",
+    "searchhost", "startmenuexperiencehost", "shellexperiencehost", "textinputhost", "lsm", "wmiprvse", "lockapp",
+    "securityhealthsystray", "smartscreen", "sgrmbroker", "wlanext", "unsecapp", "dashost", "spoolsv",
 ];
 
 pub fn is_system_process(name: &str) -> bool {
@@ -192,18 +194,22 @@ pub fn snapshot(include_slow: bool) -> HealthSnapshot {
     top_cpu.sort_by(|a, b| b.cpu_percent.total_cmp(&a.cpu_percent));
     top_cpu.truncate(TOP_N);
 
-    let temperatures = Components::new_with_refreshed_list()
+    let mut temperatures: Vec<Temperature> = Components::new_with_refreshed_list()
         .map(|c| {
             c.iter()
                 .filter_map(|c| {
                     c.temperature().filter(|t| *t > 0.0 && *t < 150.0).map(|t| Temperature {
-                        label: c.label().to_string(),
+                        // On Windows these are ACPI zones on the motherboard, not the CPU.
+                        label: if cfg!(windows) { format!("Motherboard sensor ({})", c.label()) } else { c.label().to_string() },
                         celsius: t,
                     })
                 })
                 .collect()
         })
         .unwrap_or_default();
+    if let Some(cpu) = system::cpu_temp_sensor() {
+        temperatures.insert(0, Temperature { label: "CPU".into(), celsius: cpu });
+    }
 
     let gpus = Gpus::new_with_refreshed_list()
         .map(|list| {

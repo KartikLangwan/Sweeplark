@@ -1,7 +1,7 @@
 import { api } from "./api";
 import type { AppInfo, Settings } from "./types";
 
-export type Page = "home" | "boost" | "optimizer" | "clean" | "monitor" | "storage" | "startup" | "health" | "tools" | "assistant" | "inbox" | "history" | "settings";
+export type Page = "home" | "boost" | "optimizer" | "clean" | "monitor" | "storage" | "apps" | "startup" | "health" | "tools" | "assistant" | "inbox" | "history" | "settings";
 
 export const ui = $state({
   page: "home" as Page,
@@ -9,7 +9,7 @@ export const ui = $state({
   settings: null as Settings | null,
   unread: 0,
   pendingApprovals: 0,
-  theme: "system" as "system" | "light" | "dark",
+  theme: "light" as "light" | "dark",
   toasts: [] as { id: number; text: string; tone: "good" | "warn" | "info" }[],
 });
 
@@ -59,9 +59,19 @@ export function chime() {
   } catch { /* audio not available */ }
 }
 
-export function applyTheme(t: "system" | "light" | "dark") {
+/** Two themes: soft light and dark. The first start follows Windows; after that, the user's pick. */
+export function initialTheme(): "light" | "dark" {
+  try {
+    const saved = localStorage.getItem("theme");
+    if (saved === "light" || saved === "dark") return saved;
+  } catch { /* ignore */ }
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+export function applyTheme(t: "light" | "dark", remember = true) {
   ui.theme = t;
-  const root = document.documentElement;
-  if (t === "system") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", t);
-  try { localStorage.setItem("theme", t); } catch { /* ignore */ }
+  document.documentElement.setAttribute("data-theme", t);
+  if (remember) {
+    try { localStorage.setItem("theme", t); } catch { /* ignore */ }
+  }
 }

@@ -52,6 +52,10 @@ path = "%LOCALAPPDATA%/BraveSoftware/Brave-Browser/User Data/*/Cache"
 path = "%LOCALAPPDATA%/BraveSoftware/Brave-Browser/User Data/*/Code Cache"
 [[cleaner.target]]
 path = "%LOCALAPPDATA%/BraveSoftware/Brave-Browser/User Data/*/GPUCache"
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/BraveSoftware/Brave-Browser/User Data/ShaderCache"
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/BraveSoftware/Brave-Browser/User Data/GrShaderCache"
 
 [[cleaner]]
 id = "vivaldi.cache"

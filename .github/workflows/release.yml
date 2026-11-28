@@ -28,9 +28,14 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: app/package-lock.json
+      - name: Tests (a release is only built when they pass)
+        run: cargo test --workspace --exclude sweeplark-app
       - name: Install UI dependencies
         working-directory: app
         run: npm ci
+      - name: Type-check UI
+        working-directory: app
+        run: npm run check
       - name: Build
         working-directory: app
         run: npx tauri build
@@ -44,6 +49,26 @@ jobs:
           Copy-Item target/release/Sweeplark.exe "out/Sweeplark-$v-Portable.exe"
           Get-ChildItem out | ForEach-Object { "{0}  {1:N1} MB" -f $_.Name, ($_.Length / 1MB) }
           Get-FileHash out/*.exe -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } | Out-File out/SHA256SUMS.txt -Encoding ascii
+      - name: Release notes
+        shell: pwsh
+        run: |
+          # "What's new" = the CHANGELOG section of this version (shown in the app's update dialog too).
+          $lines = Get-Content CHANGELOG.md
+          $start = ($lines | Select-String -Pattern "^## $env:VERSION" | Select-Object -First 1).LineNumber
+          $notes = @()
+          if ($start) {
+            foreach ($l in $lines[$start..($lines.Count - 1)]) { if ($l -match '^## ') { break }; $notes += $l }
+          }
+          $table = @(
+            "",
+            "| File | For |",
+            "|---|---|",
+            "| ``Sweeplark-$env:VERSION-Setup.exe`` | **Recommended.** Installs for your user (no admin), starts with Windows in the tray, data in ``%LOCALAPPDATA%\Sweeplark``. |",
+            "| ``Sweeplark-$env:VERSION-Portable.exe`` | Single exe, no install. Keeps its data in a ``SweeplarkData`` folder next to it. Needs the Microsoft Edge WebView2 Runtime (built into Windows 11). |",
+            "",
+            "Windows 10/11 (64-bit). Not code-signed yet, so SmartScreen may say ""Windows protected your PC"": click **More info → Run anyway**. Checksums are in ``SHA256SUMS.txt``."
+          )
+          (@("**Sweeplark** — Small bird. Clean PC.", "", "### What's new") + $notes + $table) | Out-File notes.md -Encoding utf8
       # Code signing (removes the SmartScreen warning once a certificate exists):
       # add Azure Trusted Signing or SignPath here and sign out/*.exe before upload.
       - uses: actions/upload-artifact@v4
@@ -60,12 +85,4 @@ jobs:
           overwrite_files: true
           name: Sweeplark v${{ env.VERSION }}
           files: out/*
-          body: |
-            **Sweeplark** — Small bird. Clean PC.
-
-            | File | For |
-            |---|---|
-            | `Sweeplark-*-Setup.exe` | **Recommended.** Installs for your user (no admin), starts with Windows in the tray, data in `%LOCALAPPDATA%\Sweeplark`. |
-            | `Sweeplark-*-Portable.exe` | Single exe, no install. Keeps its data in a `SweeplarkData` folder next to it. Does not start with Windows. |
-
-            Windows 10/11 (64-bit). The installer is not code-signed yet, so Windows SmartScreen may show "Windows protected your PC": click **More info → Run anyway**. Checksums are in `SHA256SUMS.txt`.
+          body_path: notes.md

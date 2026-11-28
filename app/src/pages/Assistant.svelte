@@ -4,22 +4,22 @@
   import FindingCard from "../components/FindingCard.svelte";
   import mark from "../assets/mark.svg";
   import { api } from "../lib/api";
+  import { actionIcon, actionLabel, runAction } from "../lib/actions";
+  import { ask, chat, clearChat } from "../lib/chat.svelte";
   import { go, ui , t } from "../lib/state.svelte";
-  import type { AiStatus, AssistantReply, ChatTurn } from "../lib/types";
+  import type { AiStatus } from "../lib/types";
 
-  type Msg = { role: "user" | "assistant"; text: string; reply?: AssistantReply; status?: string; pending?: boolean };
-
-  let msgs = $state<Msg[]>([]);
   let input = $state("");
-  let busy = $state(false);
   let status = $state<AiStatus | null>(null);
   let scroller: HTMLDivElement;
+  const msgs = $derived(chat.msgs);
+  const busy = $derived(chat.busy);
 
   const suggestions = $derived(ui.settings?.language === "hinglish"
-    ? ["Mera PC slow kyun hai?", "C drive kyun bhar rahi hai?", "Kya mera PC virus se safe hai?", "Battery kaisi hai?", "Aaj tumne kya kiya?", "Tum kaun ho?"]
-    : ["Why is my PC slow?", "Why is my C drive filling up?", "Is my PC protected from viruses?", "How is my battery?", "What did you do today?", "Who are you?"]);
+    ? ["Mera PC slow kyun hai?", "RAM kaise khaali karoon?", "Kaunse optimizations baaki hain?", "C drive kyun bhar rahi hai?", "Sabse badi apps kaunsi hain?", "Mera GPU kitna use ho raha hai?", "Kya mera PC virus se safe hai?", "Aaj tumne kya kiya?"]
+    : ["Why is my PC slow?", "How do I free up RAM?", "Which optimizations are still off?", "Why is my C drive filling up?", "What are my biggest apps?", "How busy is my graphics card?", "Is my PC protected from viruses?", "What did you do today?"]);
 
-  onMount(() => { api.aiStatus().then((s) => (status = s)); });
+  onMount(() => { api.aiStatus().then((s) => (status = s)); scrollDown(); });
 
   const modelName = $derived(status?.models.find((m) => m.tier === status?.tier)?.name);
   const aiReady = $derived(!!status?.enabled && !!status.tier && status.install.installed_tiers.includes(status.tier) && status.install.runtime_installed);
@@ -30,28 +30,10 @@
   }
 
   async function send(q = input) {
-    q = q.trim();
-    if (!q || busy) return;
+    if (!q.trim() || busy) return;
     input = "";
-    busy = true;
-    const history: ChatTurn[] = msgs.filter((m) => !m.pending).map((m) => ({ role: m.role, content: m.text }));
-    msgs.push({ role: "user", text: q });
-    msgs.push({ role: "assistant", text: "", pending: true, status: t("Thinking…", "Soch raha hoon…") });
-    const idx = msgs.length - 1;
-    scrollDown();
-    try {
-      const reply = await api.chat(q, history.slice(-6), (e) => {
-        if (e.event === "status") msgs[idx].status = e.data;
-        else { msgs[idx].text += e.data; msgs[idx].status = undefined; scrollDown(); }
-      });
-      msgs[idx] = { role: "assistant", text: reply.text, reply };
-    } catch (e) {
-      msgs[idx] = { role: "assistant", text: t(`Sorry, I couldn't answer: ${e}`, `Maaf kijiye, jawab nahi bana: ${e}`) };
-    } finally {
-      busy = false;
-      scrollDown();
-      api.aiStatus().then((s) => (status = s));
-    }
+    await ask(q, scrollDown);
+    api.aiStatus().then((s) => (status = s));
   }
 </script>
 
@@ -63,7 +45,10 @@
         {#if aiReady}{modelName} · {status?.loaded ? t("loaded now", "abhi load hai") : t("loads when needed", "zarurat par load hoga")}{:else}{t("No AI model installed: you get the app's own answers", "AI model nahi laga: app ke apne jawab milenge")}{/if}
       </p>
     </div>
-    {#if !aiReady}<button class="btn" onclick={() => go("settings")}><Icon name="download" size={17} />{t("Install AI model", "AI model lagayein")}</button>{/if}
+    <div class="row">
+      {#if msgs.length}<button class="btn ghost small" onclick={clearChat} disabled={busy}><Icon name="restart" size={14} />{t("New chat", "Nayi baat")}</button>{/if}
+      {#if !aiReady}<button class="btn" onclick={() => go("settings")}><Icon name="download" size={17} />{t("Install AI model", "AI model lagayein")}</button>{/if}
+    </div>
   </header>
 
   <div class="chat card" bind:this={scroller}>
@@ -71,7 +56,7 @@
       <div class="welcome">
         <img src={mark} alt="" width="64" height="64" />
         <h2>{t(`I'm ${ui.info?.name ?? "Sweeplark"}. Ask me anything about your PC.`, `Main ${ui.info?.name ?? "Sweeplark"} hoon. PC ke baare mein kuch bhi poochiye.`)}</h2>
-        <p class="muted">{t("I answer from your PC's real data (RAM, disks, startup, security). I never delete or turn off anything myself; I only suggest.", "Main aapke PC ki asli jaankari (RAM, disk, startup, security) dekh kar jawab deta hoon. Main khud kuch delete ya band nahi karta: sirf salah deta hoon.")}</p>
+        <p class="muted">{t("I answer from your PC's real data: RAM, CPU, graphics card, disks, background apps, startup, Optimizer tweaks, installed apps and security. I never change anything myself; I suggest and give you a button to do it.", "Main aapke PC ki asli jaankari dekh kar jawab deta hoon: RAM, CPU, graphics card, disk, background apps, startup, Optimizer tweaks, installed apps aur security. Main khud kuch nahi badalta; salah aur button deta hoon.")}</p>
         <div class="sugs">{#each suggestions as s}<button class="btn small" onclick={() => send(s)}>{s}</button>{/each}</div>
       </div>
     {/if}
@@ -87,6 +72,9 @@
             {#if m.reply}
               {#if m.reply.key_points.length && m.reply.source === "model"}
                 <div class="col points">{#each m.reply.key_points.slice(0, 3) as f}<FindingCard finding={f} compact />{/each}</div>
+              {/if}
+              {#if m.reply.actions.length}
+                <div class="row wrap acts">{#each m.reply.actions as a}<button class="btn small" onclick={() => runAction(a)}><Icon name={actionIcon(a)} size={14} />{actionLabel(a)}</button>{/each}</div>
               {/if}
               <span class="meta">{m.reply.source === "model" ? t(`Written by ${m.reply.model} · `, `${m.reply.model} ne likha · `) : t("App answer · ", "App ka jawab · ")}{t("checked:", "dekha:")} {m.reply.tools.join(", ")}</span>
             {/if}
@@ -115,6 +103,7 @@
   .avatar { flex: none; margin-top: 2px; }
   .grow { flex: 1; min-width: 0; }
   .meta { font-size: 11.5px; color: var(--slate); }
+  .acts { gap: 6px; }
   .composer { display: flex; gap: 10px; padding: 10px; margin-top: 12px; }
   .composer input { flex: 1; border: 0; background: transparent; height: 40px; }
   .composer input:focus-visible { outline: none; }

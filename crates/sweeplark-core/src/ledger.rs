@@ -209,6 +209,22 @@ impl Ledger {
             .optional()?)
     }
 
+    /// Newest change of a category that can still be undone.
+    pub fn latest_undoable_in(&self, category: &str) -> Result<Option<ChangeRecord>> {
+        Ok(self
+            .conn
+            .query_row(
+                &format!(
+                    "SELECT {} FROM changes WHERE category = ?1 AND revert != '[]'
+                     AND status IN ('applied', 'partial') ORDER BY id DESC LIMIT 1",
+                    Self::COLS
+                ),
+                params![category],
+                Self::row_to_record,
+            )
+            .optional()?)
+    }
+
     pub fn get(&self, id: i64) -> Result<Option<ChangeRecord>> {
         Ok(self
             .conn

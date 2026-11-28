@@ -15,7 +15,10 @@ pub struct LiveStats {
     pub cpu_percent: f32,
     pub per_core: Vec<f32>,
     pub cpu_mhz: u64,
+    /// Real CPU sensor, when Windows exposes one.
     pub cpu_temp: Option<f32>,
+    /// ACPI thermal zone (motherboard / chassis), not the CPU itself.
+    pub board_temp: Option<f32>,
     pub ram_used: u64,
     pub ram_total: u64,
     pub swap_used: u64,
@@ -41,12 +44,27 @@ pub struct ProcessGroup {
     pub system: bool,
 }
 
+/// One process for Boost: id, parent, name, CPU (% of the whole CPU) and RAM.
+#[derive(Debug, Clone)]
+pub struct ProcInfo {
+    pub pid: u32,
+    pub parent: Option<u32>,
+    pub name: String,
+    pub cpu: f32,
+    pub memory: u64,
+}
+
 pub struct Monitor {
     sys: System,
     networks: Option<Networks>,
     components: Option<Components>,
     last: Instant,
+    /// When the process table was last refreshed (CPU % needs two refreshes apart).
+    last_procs: Option<Instant>,
     gpu: gpu::GpuReader,
+    gpu_name: Option<String>,
+    /// CPU sensor reading and when it was taken (asked at most every 5 s; WMI is not free).
+    cpu_temp: Option<(Instant, Option<f32>)>,
 }
 
 impl Default for Monitor {
@@ -60,12 +78,24 @@ impl Monitor {
         let mut sys = System::new().expect("system info");
         sys.refresh_cpu_all();
         sys.refresh_memory();
+        // Name of the main graphics card for every vendor (NVML only knows NVIDIA).
+        let gpu_name = sysinfo::Gpus::new_with_refreshed_list().ok().and_then(|list| {
+            let names: Vec<String> = list
+                .iter()
+                .map(|g| [g.vendor(), g.model()].into_iter().flatten().collect::<Vec<_>>().join(" ").trim().to_string())
+                .filter(|n| !n.is_empty() && !n.to_lowercase().contains("basic display"))
+                .collect();
+            names.iter().find(|n| !n.to_lowercase().contains("intel")).or(names.first()).cloned()
+        });
         Self {
             sys,
             networks: Networks::new_with_refreshed_list().ok(),
             components: Components::new_with_refreshed_list().ok(),
             last: Instant::now(),
+            last_procs: None,
             gpu: gpu::GpuReader::new(),
+            gpu_name,
+            cpu_temp: None,
         }
     }
 
@@ -83,7 +113,14 @@ impl Monitor {
             }
         }
         let mut cpu_temp = None;
-        if let Some(c) = self.components.as_mut() {
+        if cfg!(windows) {
+            // On Windows the generic sensors are ACPI thermal zones (motherboard), not the CPU.
+            let fresh = self.cpu_temp.is_some_and(|(t, _)| t.elapsed() < std::time::Duration::from_secs(5));
+            if !fresh {
+                self.cpu_temp = Some((Instant::now(), crate::platform::system::cpu_temp_sensor()));
+            }
+            cpu_temp = self.cpu_temp.and_then(|(_, v)| v);
+        } else if let Some(c) = self.components.as_mut() {
             c.refresh(false);
             cpu_temp = c
                 .iter()
@@ -100,12 +137,13 @@ impl Monitor {
             cpu_percent: self.sys.global_cpu_usage(),
             per_core: self.sys.cpus().iter().map(|c| c.usage()).collect(),
             cpu_mhz: self.sys.cpus().first().map(|c| c.frequency()).unwrap_or(0),
-            cpu_temp: cpu_temp.or(g.thermal_zone),
+            cpu_temp,
+            board_temp: g.thermal_zone,
             ram_used: self.sys.used_memory(),
             ram_total: self.sys.total_memory(),
             swap_used: self.sys.used_swap(),
             swap_total: self.sys.total_swap(),
-            gpu_name: g.name,
+            gpu_name: g.name.or_else(|| self.gpu_name.clone()),
             gpu_percent: g.usage,
             gpu_temp: g.temp,
             vram_used: g.vram_used,
@@ -118,13 +156,22 @@ impl Monitor {
         }
     }
 
+    /// Refresh the process table so CPU % is meaningful: the first refresh (or one after a
+    /// long pause) only sets a baseline, so a second one follows shortly after.
+    fn refresh_procs(&mut self) {
+        let kind = ProcessRefreshKind::nothing().with_cpu().with_memory();
+        let stale = self.last_procs.is_none_or(|t| t.elapsed() > std::time::Duration::from_secs(10));
+        self.sys.refresh_processes_specifics(ProcessesToUpdate::All, true, kind);
+        if stale {
+            std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL.max(std::time::Duration::from_millis(400)));
+            self.sys.refresh_processes_specifics(ProcessesToUpdate::All, true, kind);
+        }
+        self.last_procs = Some(Instant::now());
+    }
+
     /// Running apps grouped by name (all Chrome processes together), heaviest first.
     pub fn processes(&mut self) -> Vec<ProcessGroup> {
-        self.sys.refresh_processes_specifics(
-            ProcessesToUpdate::All,
-            true,
-            ProcessRefreshKind::nothing().with_cpu().with_memory(),
-        );
+        self.refresh_procs();
         let cores = self.sys.cpus().len().max(1) as f32;
         let mut map: HashMap<String, ProcessGroup> = HashMap::new();
         for (pid, p) in self.sys.processes() {
@@ -153,15 +200,37 @@ impl Monitor {
         self.gpu.per_process()
     }
 
-    /// Fresh process table for Boost: (pid, name, cpu % of whole CPU, working set bytes).
-    pub fn raw_processes(&mut self) -> Vec<(u32, String, f32, u64)> {
-        self.sys.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing().with_cpu().with_memory());
+    /// Fresh process table for Boost.
+    pub fn raw_processes(&mut self) -> Vec<ProcInfo> {
+        self.refresh_procs();
         let cores = self.sys.cpus().len().max(1) as f32;
         self.sys
             .processes()
             .iter()
-            .map(|(pid, p)| (pid.as_u32(), p.name().to_string_lossy().into_owned(), p.cpu_usage() / cores, p.memory()))
+            .map(|(pid, p)| ProcInfo {
+                pid: pid.as_u32(),
+                parent: p.parent().map(|x| x.as_u32()),
+                name: p.name().to_string_lossy().into_owned(),
+                cpu: p.cpu_usage() / cores,
+                memory: p.memory(),
+            })
             .collect()
+    }
+
+    /// Ids of Sweeplark and everything it started (its WebView, the AI engine).
+    fn own_tree(&self) -> std::collections::HashSet<u32> {
+        let mut set = std::collections::HashSet::from([std::process::id()]);
+        loop {
+            let before = set.len();
+            for (pid, p) in self.sys.processes() {
+                if p.parent().is_some_and(|pp| set.contains(&pp.as_u32())) {
+                    set.insert(pid.as_u32());
+                }
+            }
+            if set.len() == before {
+                return set;
+            }
+        }
     }
 
     /// End every process of an app. Windows and Sweeplark's own processes are refused.
@@ -169,14 +238,20 @@ impl Monitor {
         if is_system_process(name) {
             return Err(crate::Error::Other(format!("{name} is part of Windows and can't be ended")));
         }
+        self.sys.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing());
+        let own = self.own_tree();
         let want = name.to_lowercase();
         let mut n = 0;
-        for p in self.sys.processes().values() {
+        for (pid, p) in self.sys.processes() {
+            if own.contains(&pid.as_u32()) {
+                continue;
+            }
             let pname = p.name().to_string_lossy().to_lowercase();
             if (pname == want || pname.trim_end_matches(".exe") == want) && p.kill() {
                 n += 1;
             }
         }
+        crate::log::info(&format!("ended {name}: {n} processes"));
         if n == 0 {
             return Err(crate::Error::Other(format!("could not end {name} (it may need administrator rights)")));
         }
@@ -316,6 +391,12 @@ mod gpu {
         /// GPU use per process id (all engines), from instance names like `pid_1234_luid_..._engtype_3D`.
         pub fn per_process(&mut self) -> Vec<(u32, f32)> {
             let Some(p) = &self.pdh else { return Vec::new() };
+            // Utilization is a rate between two collections: give it half a second, not the
+            // few milliseconds since the last read.
+            unsafe {
+                PdhCollectQueryData(p.query);
+            }
+            std::thread::sleep(std::time::Duration::from_millis(500));
             unsafe {
                 PdhCollectQueryData(p.query);
             }

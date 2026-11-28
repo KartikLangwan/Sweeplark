@@ -18,7 +18,7 @@ export interface CleanerPreview {
 export interface ScanReport { cleaners: CleanerPreview[]; total_files: number; total_bytes: number; duration_ms: number }
 export interface CleanOutcome {
   id: string; name: string; deleted_files: number; freed_bytes: number; in_use: number; changed: number;
-  kept_for_approval: number; skipped_reason: string | null; errors: string[];
+  kept_for_approval: number; recycled: number; skipped_reason: string | null; errors: string[];
 }
 export interface CleanReport { outcomes: CleanOutcome[]; freed_bytes: number; deleted_files: number; ledger_id: number | null }
 
@@ -47,7 +47,7 @@ export interface Health {
 
 export type SuggestedAction =
   | { kind: "clean" } | { kind: "review_startup" } | { kind: "restart" } | { kind: "open_windows_security" }
-  | { kind: "backup" } | { kind: "close_apps"; apps: string[] };
+  | { kind: "backup" } | { kind: "close_apps"; apps: string[] } | { kind: "boost" } | { kind: "optimize" } | { kind: "apps" };
 export interface Finding {
   id: string; severity: Severity; topics: string[]; title: string; detail: string; action: SuggestedAction | null;
 }
@@ -117,6 +117,8 @@ export interface Settings {
   };
   check_updates: boolean;
   skipped_version: string | null;
+  boost: { never: string[]; auto_game: boolean; ram_guard: boolean; ram_guard_percent: number };
+  restore_point_before_tweaks: boolean;
 }
 export interface AppInfo {
   name: string; tagline: string; tagline_hi: string; version: string; is_admin: boolean; os: string;
@@ -133,20 +135,25 @@ export interface TweakState {
   available: boolean; applied: boolean; can_undo: boolean;
 }
 export interface LiveStats {
-  cpu_percent: number; per_core: number[]; cpu_mhz: number; cpu_temp: number | null; ram_used: number; ram_total: number;
+  cpu_percent: number; per_core: number[]; cpu_mhz: number; cpu_temp: number | null; board_temp: number | null; ram_used: number; ram_total: number;
   swap_used: number; swap_total: number; gpu_name: string | null; gpu_percent: number | null; gpu_temp: number | null;
   vram_used: number | null; vram_total: number | null; net_down_bps: number; net_up_bps: number;
   disk_read_bps: number | null; disk_write_bps: number | null; processes: number;
 }
 export interface ProcessGroup { name: string; pids: number[]; cpu_percent: number; memory_bytes: number; system: boolean }
-export interface SizedPath { path: string; bytes: number; files: number }
+export interface SizedPath { path: string; bytes: number; files: number; modified?: number }
+export interface DuplicateGroup { bytes: number; files: SizedPath[] }
+export interface DuplicateReport { root: string; groups: DuplicateGroup[]; wasted_bytes: number; scanned_files: number; complete: boolean; duration_ms: number }
+export interface InstalledApp { id: string; name: string; publisher: string | null; version: string | null; size_bytes: number | null; install_date: string | null; location: string | null; for_all_users: boolean }
+export interface AppUpdate { name: string; id: string; current: string; available: string }
+export interface JobProgress { job: string; done: number; total: number; text: string }
 export interface StorageReport {
   root: string; total_bytes: number; total_files: number; folders: SizedPath[]; big_files: SizedPath[];
   by_kind: [string, number][]; complete: boolean; duration_ms: number;
 }
-export type ToolId = "flush_dns" | "restart_explorer" | "rebuild_icon_cache" | "sfc" | "dism" | "reset_network" | "reset_windows_update" | "disk_check" | "cancel_shutdown";
+export type ToolId = "flush_dns" | "restart_explorer" | "rebuild_icon_cache" | "sfc" | "dism" | "reset_network" | "reset_windows_update" | "disk_check" | "cancel_shutdown" | "component_cleanup" | "restore_point";
 export interface PowerPlan { guid: string; name: string; active: boolean }
 export interface BoostApp { name: string; pids: number[]; memory_bytes: number; cpu_percent: number; gpu_percent: number }
-export interface BoostPlan { ram_used: number; ram_total: number; cpu_percent: number; gpu_percent: number | null; foreground: string | null; apps: BoostApp[]; can_purge_standby: boolean }
-export interface BoostOptions { trim_ram: boolean; purge_standby: boolean; eco_cpu: boolean; eco_gpu: boolean; high_performance: boolean; apps: string[] }
-export interface BoostReport { ram_before: number; ram_after: number; trimmed: number; standby_purged: boolean; eco: string[]; power_plan: string | null; errors: string[] }
+export interface BoostPlan { ram_used: number; ram_total: number; cpu_percent: number; gpu_percent: number | null; foreground: string | null; apps: BoostApp[]; protected: string[]; can_purge_standby: boolean; on_battery: boolean }
+export interface BoostOptions { trim_ram: boolean; purge_standby: boolean; eco_cpu: boolean; eco_gpu: boolean; high_performance: boolean; apps: string[] | null }
+export interface BoostReport { ram_before: number; ram_after: number; trimmed: number; standby_purged: boolean; eco: string[]; power_plan: string | null; previous_plan: string | null; errors: string[]; ledger_id: number | null }

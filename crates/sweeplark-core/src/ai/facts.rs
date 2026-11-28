@@ -24,10 +24,14 @@ pub enum Tool {
     Heat,
     History,
     Problems,
+    Optimizer,
+    Graphics,
+    Background,
+    Apps,
 }
 
 impl Tool {
-    pub const ALL: [Tool; 9] = [
+    pub const ALL: [Tool; 13] = [
         Tool::Specs,
         Tool::Performance,
         Tool::Storage,
@@ -37,6 +41,10 @@ impl Tool {
         Tool::Heat,
         Tool::History,
         Tool::Problems,
+        Tool::Optimizer,
+        Tool::Graphics,
+        Tool::Background,
+        Tool::Apps,
     ];
 
     pub fn name(self) -> &'static str {
@@ -50,6 +58,10 @@ impl Tool {
             Tool::Heat => "heat",
             Tool::History => "history",
             Tool::Problems => "problems",
+            Tool::Optimizer => "optimizer",
+            Tool::Graphics => "graphics",
+            Tool::Background => "background",
+            Tool::Apps => "apps",
         }
     }
 
@@ -64,6 +76,10 @@ impl Tool {
             Tool::Heat => "temperatures",
             Tool::History => "what the app cleaned or changed recently",
             Tool::Problems => "list of problems the app found",
+            Tool::Optimizer => "Windows tweaks: which recommended ones are still off",
+            Tool::Graphics => "graphics card use, video memory and temperature now",
+            Tool::Background => "background apps using RAM, CPU or GPU that Boost could calm",
+            Tool::Apps => "installed programs and the biggest ones",
         }
     }
 
@@ -79,6 +95,21 @@ pub trait PcSource {
     fn scan(&self) -> Option<ScanReport>;
     fn startup(&self) -> Vec<StartupItem>;
     fn history(&self) -> Option<(LedgerSummary, Vec<ChangeRecord>)>;
+    /// Optimizer tweaks and whether each is on.
+    fn tweaks(&self) -> Vec<crate::tweaks::TweakState> {
+        Vec::new()
+    }
+    /// Live CPU/GPU/RAM numbers.
+    fn live(&self) -> Option<crate::monitor::LiveStats> {
+        None
+    }
+    /// Background apps Boost would look at.
+    fn background(&self) -> Option<crate::boost::BoostPlan> {
+        None
+    }
+    fn apps(&self) -> Vec<crate::apps::InstalledApp> {
+        Vec::new()
+    }
 }
 
 /// Facts gathered lazily: each source is read at most once per question.
@@ -273,7 +304,70 @@ impl<'a> Facts<'a> {
                 let f = self.findings();
                 f.iter().take(5).map(|f| format!("- {}", f.title)).collect::<Vec<_>>().join("\n")
             }
+            Tool::Optimizer => {
+                let all = self.tweaks();
+                if all.is_empty() {
+                    return "Optimizer status not available.".into();
+                }
+                let on = all.iter().filter(|t| t.applied).count();
+                let todo: Vec<&str> =
+                    all.iter().filter(|t| t.recommended && t.available && !t.applied).map(|t| t.name.as_str()).take(6).collect();
+                if todo.is_empty() {
+                    format!("{on} of {} tweaks are on. All recommended optimizations are already on.", all.len())
+                } else {
+                    format!("{on} of {} tweaks are on. Recommended but still off: {}.", all.len(), todo.join(", "))
+                }
+            }
+            Tool::Graphics => match self.src.live() {
+                None => "Graphics card numbers not available.".into(),
+                Some(l) => {
+                    let mut parts = vec![format!("GPU {}", l.gpu_name.clone().unwrap_or_else(|| "unknown".into()))];
+                    if let Some(u) = l.gpu_percent {
+                        parts.push(format!("in use {u:.0}%"));
+                    }
+                    if let (Some(u), Some(t)) = (l.vram_used, l.vram_total) {
+                        parts.push(format!("video memory {} of {}", gb(u), gb(t)));
+                    }
+                    if let Some(t) = l.gpu_temp {
+                        parts.push(format!("{t:.0}°C"));
+                    }
+                    parts.join(", ") + "."
+                }
+            },
+            Tool::Background => match self.src.background() {
+                None => "Background apps not available.".into(),
+                Some(p) => {
+                    let list = p
+                        .apps
+                        .iter()
+                        .take(5)
+                        .map(|a| format!("{} {} RAM {:.0}% CPU", a.name, gb(a.memory_bytes), a.cpu_percent))
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    format!(
+                        "RAM {} of {} in use. Background apps Boost can calm: {}.{}",
+                        gb(p.ram_used),
+                        gb(p.ram_total),
+                        if list.is_empty() { "none heavy".into() } else { list },
+                        p.foreground.map(|f| format!(" App in front (left alone): {f}.")).unwrap_or_default()
+                    )
+                }
+            },
+            Tool::Apps => {
+                let apps = self.src.apps();
+                if apps.is_empty() {
+                    return "Installed programs not available.".into();
+                }
+                let mut big: Vec<_> = apps.iter().filter(|a| a.size_bytes.is_some()).collect();
+                big.sort_by_key(|a| std::cmp::Reverse(a.size_bytes));
+                let top = big.iter().take(5).map(|a| format!("{} {}", a.name, gb(a.size_bytes.unwrap_or(0)))).collect::<Vec<_>>().join(", ");
+                format!("{} programs installed. Biggest: {top}.", apps.len())
+            }
         }
+    }
+
+    fn tweaks(&self) -> Vec<crate::tweaks::TweakState> {
+        self.src.tweaks()
     }
 }
 

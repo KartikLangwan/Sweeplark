@@ -3,7 +3,7 @@
 
 import type {
   AiStatus, AppInfo, Approval, AssistantReply, ChatEvent, ChatTurn, CleanReport, ChangeRecord, Health, History,
-  Inbox, OptimizePlan, UpdateInfo, TweakState, LiveStats, ProcessGroup, StorageReport, ToolId, PowerPlan, BoostPlan, BoostOptions, BoostReport, OptimizeReport, ScanReport, Settings, StartupItem, Tier, InstallProgress,
+  Inbox, OptimizePlan, DuplicateReport, InstalledApp, AppUpdate, UpdateInfo, TweakState, LiveStats, ProcessGroup, StorageReport, ToolId, PowerPlan, BoostPlan, BoostOptions, BoostReport, OptimizeReport, ScanReport, Settings, StartupItem, Tier, InstallProgress,
 } from "./types";
 
 export const inTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -48,13 +48,13 @@ export const api = {
   aiUnload: () => call<void>("ai_unload"),
   efficiency: (name: string, on: boolean) => call<number>("efficiency_mode", { name, on }),
   openSecurity: () => call<void>("open_windows_security"),
-  relaunchAdmin: () => call<void>("relaunch_as_admin"),
+  relaunchAdmin: (page: string | null = null) => call<void>("relaunch_as_admin", { page }),
   updateCheck: (manual = false) => call<UpdateInfo | null>("update_check", { manual }),
   updateInstall: () => call<void>("update_install"),
   updateSkip: (version: string) => call<void>("update_skip", { version }),
   tweaks: () => call<TweakState[]>("tweaks_list"),
-  tweakSet: (id: string, on: boolean) => call<void>("tweak_set", { id, on }),
-  tweaksApply: (ids: string[]) => call<{ applied: string[]; skipped: [string, string][] }>("tweaks_apply_recommended", { ids }),
+  tweakSet: (id: string, on: boolean) => call<string | null>("tweak_set", { id, on }),
+  tweaksApply: (ids: string[]) => call<{ applied: string[]; skipped: [string, string][]; restore_point: string | null }>("tweaks_apply_recommended", { ids }),
   live: () => call<LiveStats>("live_stats"),
   processes: () => call<ProcessGroup[]>("process_list"),
   endProcess: (name: string) => call<number>("process_end", { name }),
@@ -69,6 +69,18 @@ export const api = {
   setPowerPlan: (guid: string | null) => call<void>("power_plan_set", { guid }),
   boostPlan: () => call<BoostPlan>("boost_plan"),
   boostApply: (options: BoostOptions) => call<BoostReport>("boost_apply", { options }),
+  boostRestore: () => call<boolean>("boost_restore"),
+  duplicates: (path?: string, minMb = 1) => call<DuplicateReport>("duplicates_find", { path: path ?? null, minMb }),
+  apps: () => call<InstalledApp[]>("apps_list"),
+  uninstall: (id: string) => call<void>("app_uninstall", { id }),
+  leftovers: () => call<string[]>("app_leftovers"),
+  appUpdates: () => call<AppUpdate[]>("app_updates"),
+  appUpdate: (id: string | null) => call<void>("app_update", { id }),
+  settingsExport: () => call<string>("settings_export"),
+  settingsImport: (json: string) => call<Settings>("settings_import", { json }),
+  pendingPage: () => call<string | null>("take_pending_page"),
+  openLogs: () => call<void>("logs_open"),
+  bugReport: () => call<string>("bug_report"),
   openUrl: (url: string) => (inTauri ? call<void>("open_url", { url }) : Promise.resolve(void window.open(url, "_blank"))),
 
   async chat(question: string, history: ChatTurn[], onEvent: (e: ChatEvent) => void): Promise<AssistantReply> {

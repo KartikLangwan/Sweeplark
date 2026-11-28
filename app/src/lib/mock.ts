@@ -29,7 +29,7 @@ const health: Health = {
     { name: "chrome", processes: 24, memory_bytes: 2.4 * GB, cpu_percent: 6.1, system: false },
     { name: "Teams", processes: 7, memory_bytes: 1.1 * GB, cpu_percent: 2.3, system: false },
   ],
-  temperatures: [{ label: "CPU Package", celsius: 61 }],
+  temperatures: [{ label: "CPU", celsius: 61 }, { label: "Motherboard sensor (ACPI\\ThermalZone\\TZ00_0)", celsius: 41 }],
   battery: { percent: 76, charging: false, on_ac_power: false, design_capacity_mwh: 56000, full_charge_capacity_mwh: 43100 },
   security: { defender_antivirus_enabled: true, defender_realtime_enabled: true, defender_signature_age_days: 1,
     firewall_profiles: [["Domain", true], ["Private", true], ["Public", true]] },
@@ -96,6 +96,7 @@ let settings: Settings = {
   },
   ai: { enabled: true, tier: "balanced", use_gpu: true, unload_after_secs: 120, review_files: true, write_summaries: true },
   check_updates: true, skipped_version: null,
+  boost: { never: [], auto_game: false, ram_guard: false, ram_guard_percent: 88 }, restore_point_before_tweaks: true,
 };
 
 const approvals: Approval[] = [{
@@ -146,11 +147,11 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export async function mock<T>(cmd: string, args: Record<string, unknown> = {}): Promise<T> {
   await wait(cmd === "scan" || cmd === "optimize_plan" ? 900 : 120);
   const table: Record<string, unknown> = {
-    app_info: { name: "Sweeplark", tagline: "Small bird. Clean PC.", tagline_hi: "Saaf PC, tez PC, aur control aapke haath mein.", version: "1.4.0", is_admin: false, os: "windows", developer: "Kartik Langwan", developer_title: "Independent developer · Delhi, India", developer_tagline: "I make websites, tools, apps and Discord bots that feel good to use.", developer_url: "https://kartiklangwan.runs-on.dev", repo: "KartikLangwan/sweeplark", portable: false } satisfies AppInfo,
+    app_info: { name: "Sweeplark", tagline: "Small bird. Clean PC.", tagline_hi: "Saaf PC, tez PC, aur control aapke haath mein.", version: "1.4.1", is_admin: false, os: "windows", developer: "Kartik Langwan", developer_title: "Independent developer · Delhi, India", developer_tagline: "I make websites, tools, apps and Discord bots that feel good to use.", developer_url: "https://kartiklangwan.runs-on.dev", repo: "KartikLangwan/sweeplark", portable: false } satisfies AppInfo,
     get_health: health,
     scan,
     clean: { freed_bytes: 2.36 * GB, deleted_files: 16541, ledger_id: 7,
-      outcomes: [{ id: "windows.temp.user", name: "Temp files (aapke)", deleted_files: 5221, freed_bytes: 1.2 * GB, in_use: 7, changed: 0, kept_for_approval: 2, skipped_reason: null, errors: [] }] } satisfies CleanReport,
+      outcomes: [{ id: "windows.temp.user", name: "Temp files (aapke)", deleted_files: 5221, freed_bytes: 1.2 * GB, in_use: 7, changed: 0, kept_for_approval: 2, recycled: 0, skipped_reason: null, errors: [] }] } satisfies CleanReport,
     startup_list: startup,
     startup_set: 8,
     history,
@@ -163,9 +164,18 @@ export async function mock<T>(cmd: string, args: Record<string, unknown> = {}): 
     approval_decide: { freed_bytes: 1.6 * GB, deleted_files: 8348, ledger_id: 8, outcomes: [] },
     ai_status: aiStatus,
     efficiency_mode: 7,
-    boost_plan: { ram_used: 6.9 * GB, ram_total: 8 * GB, cpu_percent: 41, gpu_percent: 37, foreground: "chrome", can_purge_standby: false,
+    boost_plan: { ram_used: 6.9 * GB, ram_total: 8 * GB, cpu_percent: 41, gpu_percent: 37, foreground: "chrome", can_purge_standby: false, on_battery: false, protected: ["Discord", "Spotify"],
       apps: [["Teams", 1.1 * GB, 6.2, 0], ["Code", 820 * MB, 1.1, 0], ["Spotify", 340 * MB, 0.6, 0], ["Discord", 410 * MB, 2.4, 4.8], ["OneDrive", 120 * MB, 3.9, 0], ["steamwebhelper", 380 * MB, 1.2, 6.1]].map(([name, m, c, g]) => ({ name, pids: [1, 2], memory_bytes: m, cpu_percent: c, gpu_percent: g })) },
-    boost_apply: { ram_before: 6.9 * GB, ram_after: 5.6 * GB, trimmed: 31, standby_purged: false, eco: ["Teams", "Discord", "OneDrive"], power_plan: "High performance", errors: [] },
+    boost_apply: { ram_before: 6.9 * GB, ram_after: 5.6 * GB, trimmed: 31, standby_purged: false, eco: ["Teams", "Discord", "OneDrive"], power_plan: "High performance", previous_plan: "381b4222-f694-41f0-9685-ff5bb260df2e", errors: [], ledger_id: 9 },
+    boost_restore: true,
+    duplicates_find: { root: "C:\\Users\\amit", wasted_bytes: 3.2 * GB, scanned_files: 18211, complete: true, duration_ms: 9100,
+      groups: [["wedding-4k.mp4", 2.1 * GB], ["setup.exe", 640 * MB], ["IMG_2041.jpg", 6 * MB]].map(([n, b]) => ({ bytes: Number(b), files: ["Videos", "Downloads\\old", "Desktop"].slice(0, n === "setup.exe" ? 3 : 2).map((d, i) => ({ path: `C:\\Users\\amit\\${d}\\${n}`, bytes: Number(b), files: 1, modified: 1700000000 + i * 86400 * 30 })) })) },
+    apps_list: [["Google Chrome", "Google LLC", 620], ["Spotify", "Spotify AB", 410], ["Zoom Workplace", "Zoom", 280], ["7-Zip 23.01 (x64)", "Igor Pavlov", 6], ["Steam", "Valve", 1200]].map(([name, publisher, mb], i) => ({ id: `m:64:${i}`, name: String(name), publisher: String(publisher), version: "1.0", size_bytes: Number(mb) * MB, install_date: "20250102", location: null, for_all_users: i % 2 === 0 })),
+    app_updates: [{ name: "Mozilla Firefox", id: "Mozilla.Firefox", current: "120.0", available: "121.0" }, { name: "7-Zip", id: "7zip.7zip", current: "22.01", available: "23.01" }],
+    app_leftovers: ["C:\\Users\\amit\\AppData\\Roaming\\Zoom"],
+    settings_export: JSON.stringify(settings, null, 2),
+    take_pending_page: null,
+    bug_report: "Sweeplark 1.4.1\nWindows: Windows 11 Home\n\nWhat happened:\n",
     tweaks_list: [
       ["perf.background_apps", "Stop apps running in the background", "performance", "ask", true, false, null, false],
       ["perf.multimedia_scheduler", "Optimize the multimedia scheduler", "performance", "safe", true, false, "reboot", true],
@@ -181,7 +191,7 @@ export async function mock<T>(cmd: string, args: Record<string, unknown> = {}): 
       ["explorer.file_extensions", "Show file extensions", "explorer", "safe", true, true, "explorer", false],
       ["taskbar.end_task", "'End task' in taskbar right-click", "taskbar", "safe", true, true, null, true],
     ].map(([id, name, category, risk, recommended, setting, restart, applied]) => ({ id, name, description: "Example description for the browser preview.", category, risk, recommended, setting, restart, note: null, source: null, needs_admin: String(id).startsWith("privacy") || String(id).startsWith("power"), available: true, applied, can_undo: applied })),
-    live_stats: { cpu_percent: 18 + Math.random() * 30, per_core: Array.from({ length: 8 }, () => Math.random() * 70), cpu_mhz: 2800, cpu_temp: 58, ram_used: 6.9 * GB, ram_total: 8 * GB, swap_used: 1.2 * GB, swap_total: 4 * GB, gpu_name: "NVIDIA GeForce RTX 3060", gpu_percent: 10 + Math.random() * 40, gpu_temp: 54 + Math.random() * 5, vram_used: 2.1 * GB, vram_total: 12 * GB, net_down_bps: Math.random() * 3 * MB, net_up_bps: Math.random() * 300 * 1024, disk_read_bps: Math.random() * 20 * MB, disk_write_bps: Math.random() * 5 * MB, processes: 214 },
+    live_stats: { cpu_percent: 18 + Math.random() * 30, per_core: Array.from({ length: 8 }, () => Math.random() * 70), cpu_mhz: 2800, cpu_temp: 58, board_temp: 41, ram_used: 6.9 * GB, ram_total: 8 * GB, swap_used: 1.2 * GB, swap_total: 4 * GB, gpu_name: "NVIDIA GeForce RTX 3060", gpu_percent: 10 + Math.random() * 40, gpu_temp: 54 + Math.random() * 5, vram_used: 2.1 * GB, vram_total: 12 * GB, net_down_bps: Math.random() * 3 * MB, net_up_bps: Math.random() * 300 * 1024, disk_read_bps: Math.random() * 20 * MB, disk_write_bps: Math.random() * 5 * MB, processes: 214 },
     process_list: health.top_memory.map((a) => ({ name: a.name, pids: Array.from({ length: a.processes }, (_, i) => 1000 + i), cpu_percent: a.cpu_percent, memory_bytes: a.memory_bytes, system: a.system })),
     storage_analyze: { root: "C:\\Users\\amit", total_bytes: 88 * GB, total_files: 214332, complete: true, duration_ms: 6100,
       folders: [["Videos", 31], ["Downloads", 22], ["AppData", 18], ["Pictures", 9], ["Documents", 5], ["Desktop", 2]].map(([n, g]) => ({ path: `C:\\Users\\amit\\${n}`, bytes: Number(g) * GB, files: 1000 })),

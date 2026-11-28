@@ -70,7 +70,7 @@ name = "Turn off AI in Microsoft Edge"
 description = "No Copilot sidebar, AI compose or page-reading in Edge."
 category = "ai"
 risk = "safe"
-recommended = true
+note = 'Edge shows "Managed by your organization" while these policies are set.'
 [[tweak.registry]]
 key = 'HKLM\SOFTWARE\Policies\Microsoft\Edge'
 name = "HubsSidebarEnabled"

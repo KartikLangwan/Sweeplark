@@ -7,20 +7,34 @@
   import { api } from "../lib/api";
   import { bytes, pct, uptime } from "../lib/format";
   import { go, toast, ui , t } from "../lib/state.svelte";
-  import type { Health, Message, OptimizePlan, OptimizeReport } from "../lib/types";
+  import type { Health, Message } from "../lib/types";
+  import { jobs, results, runJob } from "../lib/jobs.svelte";
+  import { tipAt } from "../lib/tips";
 
   let health = $state<Health | null>(null);
-  let plan = $state<OptimizePlan | null>(null);
-  let report = $state<OptimizeReport | null>(null);
-  let phase = $state<"idle" | "scanning" | "planned" | "fixing" | "done">("idle");
+  // Kept in the shared store: One-Click keeps going when you open another page.
+  const plan = $derived(results.plan);
+  const report = $derived(results.optimized);
+  const phase = $derived(results.homePhase);
   let latest = $state<Message | null>(null);
   let showPlan = $state(false);
+  let tipN = $state(Math.floor(Math.random() * 40));
+  const quick = $derived([
+    { page: "boost" as const, icon: "rocket" as const, title: t("Boost", "Boost"), desc: t("Calm down heavy apps when RAM runs low", "RAM kam ho to bhari apps ko shant karein") },
+    { page: "clean" as const, icon: "broom" as const, title: t("Clean", "Safai"), desc: t("Remove junk, caches and temp files", "Junk, cache aur temp files hatayein") },
+    { page: "optimizer" as const, icon: "sparkle" as const, title: t("Optimizer", "Optimizer"), desc: t("Tune startup and Windows settings", "Startup aur Windows settings sudharein") },
+    { page: "storage" as const, icon: "disk" as const, title: t("Storage", "Storage"), desc: t("See what fills your drives", "Dekhein drive mein kya bhara hai") },
+    { page: "apps" as const, icon: "apps" as const, title: t("Apps", "Apps"), desc: t("Manage installed apps and updates", "Installed apps aur updates sambhalein") },
+    { page: "assistant" as const, icon: "chat" as const, title: t("Assistant", "Assistant"), desc: t("Ask why your PC feels slow", "Poochein PC slow kyun hai") },
+  ]);
 
   onMount(() => {
     api.health(true).then((h) => (health = h));
     api.inbox().then((b) => (latest = b.messages.find((m) => m.kind === "daily" || m.kind === "weekly") ?? null));
-    const t = setInterval(() => api.health(false).then((h) => { if (health) health = { ...h, security: health.security, battery: health.battery }; }), 8000);
-    return () => clearInterval(t);
+    const tips = setInterval(() => (tipN += 1), 6000);
+    // Light refresh: the shared live monitor, not a full health snapshot.
+    const t = setInterval(() => api.live().then((l) => { if (health) health = { ...health, memory_used: l.ram_used, memory_total: l.ram_total, cpu_percent: l.cpu_percent }; }).catch(() => {}), 5000);
+    return () => { clearInterval(t); clearInterval(tips); };
   });
 
   const ram = $derived(health ? (health.memory_used / health.memory_total) * 100 : 0);
@@ -40,32 +54,27 @@
   const mood = $derived(score >= 85 ? t("Looking great", "Bahut badhiya") : score >= 65 ? t("Doing okay, needs a little care", "Theek hai, thoda dhyan chahiye") : t("Needs attention", "Dhyan chahiye"));
 
   async function optimize() {
-    phase = "scanning";
-    report = null;
-    try {
-      plan = await api.optimizePlan();
-      health = plan.health;
-      phase = "planned";
-    } catch (e) {
-      toast(String(e), "warn");
-      phase = "idle";
-    }
+    results.homePhase = "scanning";
+    results.optimized = null;
+    const p = await runJob("optimize", t("One-Click check", "One-Click jaanch"), "home", () => api.optimizePlan());
+    if (!p) { results.homePhase = "idle"; return; }
+    results.plan = p;
+    health = p.health;
+    results.homePhase = "planned";
   }
 
   async function fix() {
-    phase = "fixing";
-    try {
-      report = await api.optimizeApply();
-      phase = "done";
-      toast(t(`Freed ${bytes(report.clean.freed_bytes)}`, `${bytes(report.clean.freed_bytes)} jagah khaali hui`));
-      api.health(false).then((h) => (health = { ...h, security: health?.security ?? null, battery: health?.battery ?? null }));
-    } catch (e) {
-      toast(String(e), "warn");
-      phase = "planned";
-    }
+    results.homePhase = "fixing";
+    const r = await runJob("optimize", t("Cleaning safe items", "Safe safai ho rahi hai"), "home", () => api.optimizeApply());
+    if (!r) { results.homePhase = "planned"; return; }
+    results.optimized = r;
+    results.homePhase = "done";
+    toast(t(`Freed ${bytes(r.clean.freed_bytes)}`, `${bytes(r.clean.freed_bytes)} jagah khaali hui`));
+    api.health(false).then((h) => (health = { ...h, security: health?.security ?? null, battery: health?.battery ?? null }));
   }
 </script>
 
+<div class="page">
 <header class="head">
   <div>
     <h1>{t("Hello", "Namaste")}</h1>
@@ -83,7 +92,8 @@
     {:else if phase === "scanning"}
       <h2>{t("Scanning…", "Scan ho raha hai…")}</h2>
       <p class="muted">{t("Checking temp files, browser caches, startup apps, RAM, disks and security. Nothing is being changed.", "Temp files, browser cache, startup apps, RAM, disk aur security dekh raha hoon. Kuch bhi badla nahi ja raha.")}</p>
-      <div class="row"><div class="spin"></div><span class="muted">{t("Just a moment…", "Thoda sa intezaar…")}</span></div>
+      <div class="row"><div class="spin"></div><span class="muted">{t("Just a moment…", "Thoda sa intezaar…")}{#if jobs.optimize?.text} · {jobs.optimize.text}{/if}</span></div>
+      <p class="tip small"><Icon name="sparkle" size={13} />{tipAt(tipN, ui.settings?.language === "hinglish")}</p>
     {:else if phase === "planned" && plan}
       <h2>{t(`${bytes(plan.auto_fix_bytes)} ready to clean safely`, `${bytes(plan.auto_fix_bytes)} safe safai taiyaar`)}</h2>
       <p class="muted">
@@ -107,7 +117,7 @@
       </p>
       <div class="row">
         <button class="btn" onclick={() => go("history")}><Icon name="history" />{t("View history", "Report dekhein")}</button>
-        <button class="btn ghost" onclick={() => (phase = "idle")}>{t("OK", "Theek hai")}</button>
+        <button class="btn ghost" onclick={() => (results.homePhase = "idle")}>{t("OK", "Theek hai")}</button>
       </div>
     {/if}
   </div>
@@ -145,6 +155,17 @@
   </div>
 </section>
 
+<section class="quick-head"><h3>{t("Quick actions", "Jaldi kaam")}</h3></section>
+<section class="actions">
+  {#each quick as q (q.page)}
+    <button class="card qa" onclick={() => go(q.page)}>
+      <span class="ic"><Icon name={q.icon} /></span>
+      <span class="qa-text"><strong>{q.title}</strong><span class="muted small">{q.desc}</span></span>
+      <Icon name="chevron" size={15} />
+    </button>
+  {/each}
+</section>
+
 <section class="two">
   <div class="card">
     <div class="card-title"><h3>{t("Worth a look", "Kya dhyan dena hai")}</h3><span class="spacer"></span>
@@ -180,21 +201,37 @@
   {/if}
   {#snippet footer()}<button class="btn primary" onclick={() => { showPlan = false; fix(); }}>{t("Fix now", "Theek karo")}</button>{/snippet}
 </Modal>
+</div>
 
 <style>
+  .page { max-width: 1080px; margin: 0 auto; }
+  .tip { display: flex; gap: 7px; align-items: flex-start; padding: 9px 11px; border-radius: 10px; background: var(--teal-soft); color: var(--teal-text); margin-top: 8px; }
   .head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 18px; }
-  .hero { display: flex; align-items: center; gap: 32px; padding: 28px 32px; margin-bottom: 18px; }
-  .hero-text { display: flex; flex-direction: column; gap: 12px; max-width: 620px; }
+  .hero { display: flex; align-items: center; gap: 32px; padding: 28px 32px; margin-bottom: 16px; }
+  .hero-text { display: flex; flex-direction: column; gap: 12px; flex: 1; min-width: 0; }
+  .hero-text > p { max-width: 560px; }
   .hero-text h2 { font-size: 24px; }
-  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 22px; }
   .stat { display: flex; flex-direction: column; gap: 8px; padding: 16px; }
   .stat strong { font-size: 24px; font-weight: 650; }
   .stat strong.warn { color: var(--amber-text); }
-  .ic { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: var(--teal-soft); color: var(--teal-text); }
-  .two { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; }
+  .ic { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: var(--teal-soft); color: var(--teal-text); flex: none; }
+  .quick-head { margin-bottom: 10px; }
+  .actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 22px; }
+  .qa { display: flex; align-items: center; gap: 13px; padding: 14px 16px; width: 100%; text-align: left; cursor: pointer; color: var(--ink); transition: border-color 0.15s, background 0.15s; }
+  .qa:hover { border-color: var(--line-strong); background: var(--surface-2); }
+  .qa:active { transform: translateY(1px); }
+  .qa:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+  .qa-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+  .qa > :last-child { color: var(--slate); }
+  .two { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; align-items: start; }
   .summary { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
   .summary .ai { font-size: 14.5px; line-height: 1.55; padding: 12px 14px; border-radius: 10px; background: var(--surface-2); border-left: 3px solid var(--teal); color: var(--ink); }
   pre { font-family: inherit; white-space: pre-wrap; margin: 0; color: var(--ink-2); font-size: 13px; }
   .empty { display: flex; flex-direction: column; align-items: center; gap: 8px; }
-  @media (max-width: 1050px) { .stats { grid-template-columns: repeat(2, 1fr); } .two { grid-template-columns: 1fr; } }
+  @media (max-width: 1050px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .actions { grid-template-columns: repeat(2, 1fr); }
+    .two { grid-template-columns: 1fr; }
+  }
 </style>

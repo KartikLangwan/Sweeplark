@@ -5,12 +5,13 @@
 /* Soft, minimal theme on the Sweeplark palette:
    Lark Teal #0FB5AE · Fresh Mint #7DE8C8 · Ink #0B1B33 · Amber #FFB039 · Soft Mint #F2FBF8 · Slate #5B6B80 */
 :root {
-  --bg: #f6faf9;
-  --surface: #ffffff;
-  --surface-2: #f8fbfa;
-  --surface-3: #eef5f3;
-  --line: #e5eeeb;
-  --line-strong: #d3e3de;
+  /* Soft light: no pure white, a gentle mint-grey paper so the screen is easy on the eyes. */
+  --bg: #edf3f1;
+  --surface: #fafcfb;
+  --surface-2: #f3f7f6;
+  --surface-3: #e6efec;
+  --line: #dde8e4;
+  --line-strong: #cadbd5;
   --ink: #0b1b33;
   --ink-2: #33445c;
   --slate: #6a7a8e;

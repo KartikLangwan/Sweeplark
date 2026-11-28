@@ -16,7 +16,10 @@ pub(crate) fn web_agent() -> ureq::Agent {
     use ureq::tls::{RootCerts, TlsConfig};
     ureq::Agent::config_builder()
         .timeout_connect(Some(Duration::from_secs(20)))
-        .timeout_recv_body(Some(Duration::from_secs(60)))
+        .timeout_recv_response(Some(Duration::from_secs(30)))
+        // Per read, not for the whole body: a 2.5 GB model on a slow line takes many
+        // minutes, but a connection that goes silent for a minute is dead.
+        .timeout_per_read(Some(Duration::from_secs(60)))
         .tls_config(TlsConfig::builder().root_certs(RootCerts::PlatformVerifier).build())
         .user_agent(concat!("sweeplark/", env!("CARGO_PKG_VERSION")))
         .http_status_as_error(false)

@@ -6,7 +6,6 @@ name = "Stop apps running in the background"
 description = "Store apps can't keep running in the background when you are not using them. Saves RAM, CPU and battery."
 category = "performance"
 risk = "ask"
-recommended = true
 note = "Some apps won't update live tiles or send notifications until opened."
 source = "https://learn.microsoft.com/windows/application-management/enterprise-background-activity-controls"
 [[tweak.registry]]

@@ -6,7 +6,7 @@ name = "Turn off Fast Startup"
 description = "A real shutdown every time: fixes many driver, update and dual-boot problems."
 category = "power"
 risk = "safe"
-recommended = true
+note = "Start-up from shutdown takes a few seconds longer, mostly on hard disks."
 restart = "reboot"
 [[tweak.registry]]
 key = 'HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Power'

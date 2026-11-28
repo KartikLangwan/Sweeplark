@@ -95,6 +95,40 @@ mod other {
     pub fn purge_standby_list() -> crate::Result<()> {
         Err(crate::Error::NotSupported("standby list".into()))
     }
+    pub fn flush_modified_list() -> crate::Result<()> {
+        Err(crate::Error::NotSupported("memory".into()))
+    }
+    pub fn to_recycle_bin(_path: &std::path::Path) -> crate::Result<()> {
+        Err(crate::Error::NotSupported("recycle bin".into()))
+    }
+    pub fn has_recycle_bin(_path: &std::path::Path) -> bool {
+        false
+    }
+    pub fn priority_class(_pid: u32) -> Option<u32> {
+        None
+    }
+    pub fn set_priority_class(_pid: u32, _class: u32) -> crate::Result<()> {
+        Err(crate::Error::NotSupported("priority".into()))
+    }
+    pub fn kill_pid(_pid: u32) -> bool {
+        false
+    }
+    pub fn window_behind_own() -> Option<u32> {
+        None
+    }
+    pub fn fullscreen_foreground() -> Option<u32> {
+        None
+    }
+    pub fn process_name(_pid: u32) -> Option<String> {
+        None
+    }
+    pub fn message_box(_title: &str, _text: &str) {}
+    pub fn cpu_temp_sensor() -> Option<f32> {
+        None
+    }
+    pub fn webview2_installed() -> bool {
+        true
+    }
 }
 
 #[cfg(windows)]
@@ -160,6 +194,16 @@ mod win {
 
     /// Empty the standby list (cached file pages), like Sysinternals RAMMap. Needs admin.
     pub fn purge_standby_list() -> crate::Result<()> {
+        memory_list_command(4)
+    }
+
+    /// Write changed pages to disk so their RAM becomes free ("flush modified list"). Admin.
+    pub fn flush_modified_list() -> crate::Result<()> {
+        memory_list_command(3)
+    }
+
+    /// 2 = empty working sets, 3 = flush modified list, 4 = purge standby, 5 = purge low-priority standby.
+    fn memory_list_command(command: i32) -> crate::Result<()> {
         use windows::Win32::Security::{
             AdjustTokenPrivileges, LUID_AND_ATTRIBUTES, LookupPrivilegeValueW, SE_PRIVILEGE_ENABLED, TOKEN_ADJUST_PRIVILEGES,
             TOKEN_PRIVILEGES,
@@ -169,9 +213,8 @@ mod win {
             fn NtSetSystemInformation(class: i32, info: *const core::ffi::c_void, len: u32) -> i32;
         }
         const SYSTEM_MEMORY_LIST_INFORMATION: i32 = 80;
-        const MEMORY_PURGE_STANDBY_LIST: i32 = 4;
         if !is_admin() {
-            return Err(crate::Error::NeedsAdmin("purge standby list".into()));
+            return Err(crate::Error::NeedsAdmin("memory clean".into()));
         }
         unsafe {
             let mut token = HANDLE::default();
@@ -182,14 +225,14 @@ mod win {
             let _ = LookupPrivilegeValueW(PCWSTR::null(), PCWSTR(name.as_ptr()), &mut tp.Privileges[0].Luid);
             let _ = AdjustTokenPrivileges(token, false, Some(&tp), 0, None, None);
             let _ = CloseHandle(token);
-            let cmd = MEMORY_PURGE_STANDBY_LIST;
-            let status = NtSetSystemInformation(SYSTEM_MEMORY_LIST_INFORMATION, (&cmd as *const i32).cast(), 4);
-            if status >= 0 { Ok(()) } else { Err(crate::Error::Other(format!("standby purge failed (0x{status:08x})"))) }
+            let status = NtSetSystemInformation(SYSTEM_MEMORY_LIST_INFORMATION, (&command as *const i32).cast(), 4);
+            if status >= 0 { Ok(()) } else { Err(crate::Error::Other(format!("memory clean failed (0x{status:08x})"))) }
         }
     }
 
     /// Windows 11 "Efficiency mode" for one process: low priority + EcoQoS power throttling.
-    /// It lasts until the process exits; turning it off restores normal priority.
+    /// It lasts until the process exits. Turning it off hands throttling back to Windows
+    /// and sets normal priority (callers that know the old priority restore that instead).
     pub fn set_efficiency_mode(pid: u32, on: bool) -> crate::Result<()> {
         use windows::Win32::System::Threading::{
             IDLE_PRIORITY_CLASS, NORMAL_PRIORITY_CLASS, OpenProcess, PROCESS_POWER_THROTTLING_CURRENT_VERSION,
@@ -199,9 +242,10 @@ mod win {
         unsafe {
             let handle = OpenProcess(PROCESS_SET_INFORMATION, false, pid)
                 .map_err(|e| crate::Error::NeedsAdmin(format!("process {pid}: {e}")))?;
+            // Off = ControlMask 0: let Windows decide again (not "never throttle").
             let state = PROCESS_POWER_THROTTLING_STATE {
                 Version: PROCESS_POWER_THROTTLING_CURRENT_VERSION,
-                ControlMask: PROCESS_POWER_THROTTLING_EXECUTION_SPEED,
+                ControlMask: if on { PROCESS_POWER_THROTTLING_EXECUTION_SPEED } else { 0 },
                 StateMask: if on { PROCESS_POWER_THROTTLING_EXECUTION_SPEED } else { 0 },
             };
             let r1 = SetProcessInformation(
@@ -213,6 +257,206 @@ mod win {
             let r2 = SetPriorityClass(handle, if on { IDLE_PRIORITY_CLASS } else { NORMAL_PRIORITY_CLASS });
             let _ = CloseHandle(handle);
             r1.and(r2).map_err(|e| crate::Error::Other(format!("could not change process {pid}: {e}")))
+        }
+    }
+
+    /// Send a file or folder to the Recycle Bin.
+    pub fn to_recycle_bin(path: &std::path::Path) -> crate::Result<()> {
+        trash::delete(path).map_err(|e| crate::Error::Other(format!("could not move to the Recycle Bin: {e}")))
+    }
+
+    /// Fixed local drives have a Recycle Bin; USB sticks and network drives do not (Windows
+    /// would delete for good there).
+    pub fn has_recycle_bin(path: &std::path::Path) -> bool {
+        use windows::Win32::Storage::FileSystem::GetDriveTypeW;
+        let s = path.to_string_lossy();
+        if s.starts_with(r"\\") {
+            return false;
+        }
+        let Some(drive) = s.get(..2).filter(|d| d.ends_with(':')) else { return false };
+        let root: Vec<u16> = format!("{drive}\\").encode_utf16().chain(std::iter::once(0)).collect();
+        // 3 = DRIVE_FIXED
+        unsafe { GetDriveTypeW(PCWSTR(root.as_ptr())) == 3 }
+    }
+
+    pub fn priority_class(pid: u32) -> Option<u32> {
+        use windows::Win32::System::Threading::{GetPriorityClass, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
+        unsafe {
+            let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
+            let c = GetPriorityClass(h);
+            let _ = CloseHandle(h);
+            (c != 0).then_some(c)
+        }
+    }
+
+    pub fn set_priority_class(pid: u32, class: u32) -> crate::Result<()> {
+        use windows::Win32::System::Threading::{OpenProcess, PROCESS_CREATION_FLAGS, PROCESS_SET_INFORMATION, SetPriorityClass};
+        unsafe {
+            let h = OpenProcess(PROCESS_SET_INFORMATION, false, pid).map_err(|e| crate::Error::Other(format!("process {pid}: {e}")))?;
+            let r = SetPriorityClass(h, PROCESS_CREATION_FLAGS(class));
+            let _ = CloseHandle(h);
+            r.map_err(|e| crate::Error::Other(format!("process {pid}: {e}")))
+        }
+    }
+
+    /// End one process right away (used to stop our own AI engine without waiting).
+    pub fn kill_pid(pid: u32) -> bool {
+        use windows::Win32::System::Threading::{OpenProcess, PROCESS_TERMINATE, TerminateProcess};
+        unsafe {
+            let Ok(h) = OpenProcess(PROCESS_TERMINATE, false, pid) else { return false };
+            let ok = TerminateProcess(h, 1).is_ok();
+            let _ = CloseHandle(h);
+            ok
+        }
+    }
+
+    fn is_app_window(hwnd: windows::Win32::Foundation::HWND) -> bool {
+        use windows::Win32::UI::WindowsAndMessaging::{
+            GWL_EXSTYLE, GetWindowLongW, GetWindowTextLengthW, IsIconic, IsWindowVisible, WS_EX_TOOLWINDOW,
+        };
+        unsafe {
+            IsWindowVisible(hwnd).as_bool()
+                && !IsIconic(hwnd).as_bool()
+                && GetWindowTextLengthW(hwnd) > 0
+                && (GetWindowLongW(hwnd, GWL_EXSTYLE) as u32 & WS_EX_TOOLWINDOW.0) == 0
+        }
+    }
+
+    fn pid_of(hwnd: windows::Win32::Foundation::HWND) -> u32 {
+        use windows::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId;
+        let mut pid = 0u32;
+        unsafe { GetWindowThreadProcessId(hwnd, Some(&mut pid)) };
+        pid
+    }
+
+    /// The app the user was using: the window in front, or, when Sweeplark itself is in
+    /// front (the user just clicked Boost), the next real app window behind it.
+    pub fn window_behind_own() -> Option<u32> {
+        use windows::Win32::UI::WindowsAndMessaging::{GW_HWNDNEXT, GetForegroundWindow, GetWindow};
+        let own = std::process::id();
+        unsafe {
+            let mut hwnd = GetForegroundWindow();
+            let mut steps = 0;
+            while !hwnd.0.is_null() && steps < 400 {
+                let pid = pid_of(hwnd);
+                if pid != 0 && pid != own && is_app_window(hwnd) {
+                    let name = process_name(pid).unwrap_or_default().to_lowercase();
+                    // The desktop and taskbar are not "the app you are using".
+                    if !matches!(name.as_str(), "explorer.exe" | "shellexperiencehost.exe" | "searchhost.exe" | "startmenuexperiencehost.exe" | "textinputhost.exe") {
+                        return Some(pid);
+                    }
+                }
+                hwnd = GetWindow(hwnd, GW_HWNDNEXT).unwrap_or_default();
+                steps += 1;
+            }
+        }
+        None
+    }
+
+    /// Process id of a full-screen app in front (a game or video), if any.
+    pub fn fullscreen_foreground() -> Option<u32> {
+        use windows::Win32::Foundation::RECT;
+        use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, MONITOR_DEFAULTTONEAREST, MONITORINFO, MonitorFromWindow};
+        use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetShellWindow, GetDesktopWindow, GetWindowRect};
+        unsafe {
+            let hwnd = GetForegroundWindow();
+            if hwnd.0.is_null() || hwnd == GetShellWindow() || hwnd == GetDesktopWindow() {
+                return None;
+            }
+            let mut r = RECT::default();
+            GetWindowRect(hwnd, &mut r).ok()?;
+            let mon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+            let mut mi = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
+            if !GetMonitorInfoW(mon, &mut mi).as_bool() {
+                return None;
+            }
+            let m = mi.rcMonitor;
+            let full = r.left <= m.left && r.top <= m.top && r.right >= m.right && r.bottom >= m.bottom;
+            let pid = pid_of(hwnd);
+            if !full || pid == 0 || pid == std::process::id() {
+                return None;
+            }
+            let name = process_name(pid).unwrap_or_default().to_lowercase();
+            (!matches!(name.as_str(), "explorer.exe" | "dwm.exe" | "lockapp.exe")).then_some(pid)
+        }
+    }
+
+    /// Real CPU temperature. Windows itself has no API for it (the "thermal zone" it offers
+    /// is a motherboard sensor and often wrong), so this reads it from LibreHardwareMonitor or
+    /// OpenHardwareMonitor when one of them is running. `None` otherwise.
+    pub fn cpu_temp_sensor() -> Option<f32> {
+        for ns in [r"ROOT\LibreHardwareMonitor", r"ROOT\OpenHardwareMonitor"] {
+            let Some(rows) = query(ns, "SELECT Name, Value, Parent FROM Sensor WHERE SensorType='Temperature'") else { continue };
+            let mut best: Option<(u8, f32)> = None;
+            for r in &rows {
+                let name = as_string(r.get("Name")).unwrap_or_default().to_lowercase();
+                let parent = as_string(r.get("Parent")).unwrap_or_default().to_lowercase();
+                if !parent.contains("cpu") && !name.contains("cpu") {
+                    continue;
+                }
+                let value = match r.get("Value") {
+                    Some(Variant::R4(v)) => *v,
+                    Some(Variant::R8(v)) => *v as f32,
+                    _ => continue,
+                };
+                if !(1.0..130.0).contains(&value) {
+                    continue;
+                }
+                // Package / Tctl first, then the hottest core.
+                let rank = if name.contains("package") || name.contains("tctl") || name.contains("tdie") { 0 } else if name.contains("core") { 1 } else { 2 };
+                if best.is_none_or(|(br, bv)| rank < br || (rank == br && value > bv)) {
+                    best = Some((rank, value));
+                }
+            }
+            if let Some((_, v)) = best {
+                return Some(v);
+            }
+        }
+        None
+    }
+
+    /// A plain Windows message box (used before any window exists).
+    pub fn message_box(title: &str, text: &str) {
+        use windows::Win32::UI::WindowsAndMessaging::{MB_ICONWARNING, MB_OK, MessageBoxW};
+        let t: Vec<u16> = title.encode_utf16().chain(std::iter::once(0)).collect();
+        let m: Vec<u16> = text.encode_utf16().chain(std::iter::once(0)).collect();
+        unsafe {
+            MessageBoxW(None, PCWSTR(m.as_ptr()), PCWSTR(t.as_ptr()), MB_OK | MB_ICONWARNING);
+        }
+    }
+
+    /// Whether the Microsoft Edge WebView2 runtime (needed for the window) is installed.
+    pub fn webview2_installed() -> bool {
+        use winreg::RegKey;
+        use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
+        const ID: &str = r"Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}";
+        let keys = [
+            (HKEY_LOCAL_MACHINE, format!(r"SOFTWARE\WOW6432Node\{ID}")),
+            (HKEY_LOCAL_MACHINE, format!(r"SOFTWARE\{ID}")),
+            (HKEY_CURRENT_USER, format!(r"Software\{ID}")),
+        ];
+        keys.iter().any(|(hive, key)| {
+            RegKey::predef(*hive)
+                .open_subkey(key)
+                .and_then(|k| k.get_value::<String, _>("pv"))
+                .is_ok_and(|v| !v.is_empty() && v != "0.0.0.0")
+        })
+    }
+
+    /// Executable name of a process (e.g. "chrome.exe").
+    pub fn process_name(pid: u32) -> Option<String> {
+        use windows::Win32::System::Threading::{OpenProcess, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW};
+        unsafe {
+            let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
+            let mut buf = vec![0u16; 1024];
+            let mut len = buf.len() as u32;
+            let ok = QueryFullProcessImageNameW(h, PROCESS_NAME_WIN32, PWSTR(buf.as_mut_ptr()), &mut len).is_ok();
+            let _ = CloseHandle(h);
+            if !ok {
+                return None;
+            }
+            let full = String::from_utf16_lossy(&buf[..len as usize]);
+            full.rsplit('\\').next().map(String::from)
         }
     }
 

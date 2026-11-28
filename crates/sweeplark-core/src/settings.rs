@@ -26,6 +26,23 @@ pub struct Settings {
     pub check_updates: bool,
     /// A version the user chose to skip.
     pub skipped_version: Option<String>,
+    pub boost: BoostSettings,
+    /// Create a Windows restore point before Optimizer changes that need administrator.
+    pub restore_point_before_tweaks: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct BoostSettings {
+    /// App names (without .exe) that Boost and Game mode never touch.
+    pub never: Vec<String>,
+    /// Game mode: when a full-screen app is in front, calm heavy background apps by
+    /// themselves and put them back when the game closes.
+    pub auto_game: bool,
+    /// RAM guard: when RAM stays above `ram_guard_percent` for a minute, free RAM from
+    /// background apps by itself (at most every 10 minutes).
+    pub ram_guard: bool,
+    pub ram_guard_percent: u8,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -142,6 +159,12 @@ impl Default for AiSettings {
     }
 }
 
+impl Default for BoostSettings {
+    fn default() -> Self {
+        Self { never: Vec::new(), auto_game: false, ram_guard: false, ram_guard_percent: 88 }
+    }
+}
+
 impl Default for Settings {
     fn default() -> Self {
         Self {
@@ -156,6 +179,8 @@ impl Default for Settings {
             ai: AiSettings::default(),
             check_updates: true,
             skipped_version: None,
+            boost: BoostSettings::default(),
+            restore_point_before_tweaks: true,
         }
     }
 }
@@ -163,14 +188,42 @@ impl Default for Settings {
 impl Settings {
     /// Load settings; a missing or broken file gives defaults (never blocks the app).
     pub fn load(path: &Path) -> Self {
-        std::fs::read_to_string(path).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_else(|| {
+        let defaults = || {
             let mut s = Settings::default();
             // A portable copy should not register itself to start with Windows.
             if crate::paths::AppPaths::is_portable() {
                 s.agent.start_with_windows = false;
             }
             s
-        })
+        };
+        let Ok(text) = std::fs::read_to_string(path) else { return defaults() };
+        match serde_json::from_str::<Settings>(&text) {
+            Ok(s) => s.sanitized(),
+            Err(e) => {
+                // Keep the broken file so the whitelist and choices are not lost for good.
+                let backup = path.with_extension(format!("broken-{}.json", chrono::Utc::now().format("%Y%m%d-%H%M%S")));
+                let _ = std::fs::copy(path, &backup);
+                crate::log::warn(&format!("settings file unreadable ({e}); using defaults, copy kept at {}", backup.display()));
+                defaults()
+            }
+        }
+    }
+
+    /// Clamp values a hand-edited or old file might have out of range.
+    pub fn sanitized(mut self) -> Self {
+        let a = &mut self.agent;
+        a.sample_minutes = a.sample_minutes.clamp(1, 60);
+        a.auto_clean.weekday = a.auto_clean.weekday.min(6);
+        a.notify.max_per_day = a.notify.max_per_day.min(50);
+        if let Some(w) = a.weekly_summary.as_mut() {
+            w.weekday = w.weekday.min(6);
+        }
+        self.recycle_bin_min_age_days = self.recycle_bin_min_age_days.min(3650);
+        self.ai.unload_after_secs = self.ai.unload_after_secs.clamp(30, 3600);
+        self.whitelist.retain(|p| !p.as_os_str().is_empty());
+        self.boost.never.retain(|n| !n.trim().is_empty());
+        self.boost.ram_guard_percent = self.boost.ram_guard_percent.clamp(70, 97);
+        self
     }
 
     pub fn save(&self, path: &Path) -> Result<()> {
@@ -198,5 +251,15 @@ mod tests {
         assert_eq!(Settings::load(&p).recycle_bin_min_age_days, 30);
         std::fs::write(&p, "{ broken").unwrap();
         assert_eq!(Settings::load(&p).recycle_bin_min_age_days, 7);
+        // The broken file is kept, so choices like the whitelist are not lost for good.
+        let kept = std::fs::read_dir(dir.path()).unwrap().flatten().any(|e| e.file_name().to_string_lossy().contains("broken-"));
+        assert!(kept);
+        // Out-of-range values from an old or hand-edited file are pulled back.
+        let mut odd = Settings::default();
+        odd.agent.sample_minutes = 0;
+        odd.boost.ram_guard_percent = 5;
+        let fixed = odd.sanitized();
+        assert_eq!(fixed.agent.sample_minutes, 1);
+        assert_eq!(fixed.boost.ram_guard_percent, 70);
     }
 }

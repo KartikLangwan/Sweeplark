@@ -58,7 +58,8 @@ fn topics_for(tools: &BTreeSet<Tool>) -> Vec<Topic> {
             Tool::Security => t.push(Topic::Security),
             Tool::Battery => t.push(Topic::Battery),
             Tool::Heat => t.push(Topic::Heat),
-            Tool::Specs | Tool::History | Tool::Problems => {}
+            Tool::Graphics | Tool::Background | Tool::Optimizer => t.push(Topic::Performance),
+            Tool::Specs | Tool::History | Tool::Problems | Tool::Apps => {}
         }
     }
     t
@@ -125,7 +126,28 @@ pub fn answer(
             actions.push(a);
         }
     }
-    let rules_text = advisor::ask(question, &findings, facts.lang).text;
+    // Actions for the new tools: buttons that open the right page (the user still decides).
+    let extra = [
+        (Tool::Background, SuggestedAction::Boost),
+        (Tool::Optimizer, SuggestedAction::Optimize),
+        (Tool::Apps, SuggestedAction::Apps),
+    ];
+    for (tool, action) in extra {
+        if tools.contains(&tool) && !actions.contains(&action) {
+            actions.push(action);
+        }
+    }
+    let mut rules_text = advisor::ask(question, &findings, facts.lang).text;
+    // Without a model, still show what the extra tools found.
+    for t in [Tool::Background, Tool::Optimizer, Tool::Graphics, Tool::Apps] {
+        if tools.contains(&t) {
+            let line = facts.run(t);
+            if !line.ends_with("not available.") {
+                rules_text.push_str("\n\n");
+                rules_text.push_str(&line);
+            }
+        }
+    }
     let base = AssistantReply {
         text: rules_text.clone(),
         source: ReplySource::Rules,

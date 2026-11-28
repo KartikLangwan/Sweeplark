@@ -38,6 +38,35 @@ async fn blocking<T: Send + 'static>(f: impl FnOnce() -> CmdResult<T> + Send + '
     tauri::async_runtime::spawn_blocking(f).await.map_err(err)?
 }
 
+/// Progress of a long task for the window's progress bar: `job-progress` events.
+#[derive(Clone, Serialize)]
+pub struct JobProgress {
+    pub job: String,
+    pub done: u64,
+    pub total: u64,
+    pub text: String,
+}
+
+pub fn progress_emitter(app: &AppHandle, job: &str) -> impl FnMut(u64, u64, &str) + use<> {
+    let app = app.clone();
+    let job = job.to_string();
+    let mut last = std::time::Instant::now() - std::time::Duration::from_secs(1);
+    move |done, total, text| {
+        if last.elapsed() >= std::time::Duration::from_millis(150) || (total > 0 && done >= total) {
+            last = std::time::Instant::now();
+            let _ = app.emit("job-progress", JobProgress { job: job.clone(), done, total, text: text.to_string() });
+        }
+    }
+}
+
+/// Log an error from a command and pass it on to the window.
+pub fn logged<T>(what: &str, r: CmdResult<T>) -> CmdResult<T> {
+    if let Err(e) = &r {
+        sweeplark_core::log::warn(&format!("{what}: {e}"));
+    }
+    r
+}
+
 fn settings_of(app: &AppHandle) -> Settings {
     app.state::<AppState>().settings.lock().map(|s| s.clone()).unwrap_or_default()
 }
@@ -91,7 +120,8 @@ pub async fn scan(app: AppHandle, expert: bool, privacy: bool) -> CmdResult<Scan
             opts.max_risk = Risk::Expert;
         }
         opts.include_privacy = privacy && s.privacy_consent;
-        let report = cleaner::scan(&app.state::<AppState>().rules, &ctx, &opts);
+        let mut progress = progress_emitter(&app, "scan");
+        let report = cleaner::scan_with(&app.state::<AppState>().rules, &ctx, &opts, &mut progress);
         *app.state::<AppState>().last_scan.lock().map_err(err)? = Some(report.clone());
         Ok(report)
     })
@@ -107,8 +137,8 @@ pub async fn clean(app: AppHandle, ids: Vec<String>, confirmed: bool, approved_f
         let guard = sweeplark_core::safety::SafetyGuard::for_current_user(s.whitelist.clone());
         let approved: Vec<std::path::PathBuf> = approved_files.into_iter().map(Into::into).collect();
         let ledger = state.ledger.lock().map_err(err)?;
-        let res = cleaner::clean(&report, &ids, confirmed, &approved, &guard, &ProcessList::current(), &state.rules, Some(&ledger))
-            .map_err(err)?;
+        let res = logged("clean", cleaner::clean(&report, &ids, confirmed, &approved, &guard, &ProcessList::current(), &state.rules, Some(&ledger))
+            .map_err(err))?;
         *state.last_scan.lock().map_err(err)? = None;
         Ok(res)
     })
@@ -119,7 +149,11 @@ pub async fn clean(app: AppHandle, ids: Vec<String>, confirmed: bool, approved_f
 pub async fn startup_list(app: AppHandle) -> CmdResult<Vec<StartupItem>> {
     blocking(move || {
         let lang = settings_of(&app).language;
-        startup::list(system_registry().as_ref(), &StartupFolders::system(), &KnownApps::builtin().with_lang(lang)).map_err(err)
+        let known = KnownApps::builtin().with_lang(lang);
+        let mut items = startup::list(system_registry().as_ref(), &StartupFolders::system(), &known).map_err(err)?;
+        items.extend(startup::logon_tasks(&known));
+        items.sort_by_key(|i| i.name.to_lowercase());
+        Ok(items)
     })
     .await
 }
@@ -128,11 +162,15 @@ pub async fn startup_list(app: AppHandle) -> CmdResult<Vec<StartupItem>> {
 pub async fn startup_set(app: AppHandle, id: String, enabled: bool) -> CmdResult<i64> {
     blocking(move || {
         let reg = system_registry();
-        let items = startup::list(reg.as_ref(), &StartupFolders::system(), &KnownApps::builtin()).map_err(err)?;
+        let known = KnownApps::builtin();
+        let mut items = startup::list(reg.as_ref(), &StartupFolders::system(), &known).map_err(err)?;
+        if id.starts_with("task:") {
+            items.extend(startup::logon_tasks(&known));
+        }
         let item = items.iter().find(|i| i.id == id).ok_or("Startup item not found")?;
         let state = app.state::<AppState>();
         let ledger = state.ledger.lock().map_err(err)?;
-        startup::set_enabled_recorded(reg.as_ref(), &ledger, item, enabled, system::is_admin(), settings_of(&app).language).map_err(err)
+        logged("startup", startup::set_enabled_recorded(reg.as_ref(), &ledger, item, enabled, system::is_admin(), settings_of(&app).language).map_err(err))
     })
     .await
 }
@@ -144,14 +182,19 @@ pub struct History {
 }
 
 #[tauri::command]
-pub fn history(state: State<'_, AppState>, limit: usize) -> CmdResult<History> {
-    let ledger = state.ledger.lock().map_err(err)?;
-    Ok(History { summary: ledger.summary().map_err(err)?, rows: ledger.list(limit).map_err(err)? })
+pub async fn history(app: AppHandle, limit: usize) -> CmdResult<History> {
+    blocking(move || {
+        let state = app.state::<AppState>();
+        let ledger = state.ledger.lock().map_err(err)?;
+        Ok(History { summary: ledger.summary().map_err(err)?, rows: ledger.list(limit).map_err(err)? })
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn undo(state: State<'_, AppState>, id: i64) -> CmdResult<ChangeRecord> {
-    state.ledger.lock().map_err(err)?.undo(id, system_registry().as_ref()).map_err(err)
+pub async fn undo(app: AppHandle, id: i64) -> CmdResult<ChangeRecord> {
+    blocking(move || logged("undo", app.state::<AppState>().ledger.lock().map_err(err)?.undo(id, system_registry().as_ref()).map_err(err)))
+        .await
 }
 
 #[tauri::command]
@@ -193,11 +236,38 @@ pub fn apply_autostart(app: &AppHandle) {
 }
 
 #[tauri::command]
-pub fn settings_set(app: AppHandle, state: State<'_, AppState>, settings: Settings) -> CmdResult<()> {
-    settings.save(&state.paths.settings_file()).map_err(err)?;
-    *state.settings.lock().map_err(err)? = settings;
-    apply_autostart(&app);
-    Ok(())
+pub async fn settings_set(app: AppHandle, settings: Settings) -> CmdResult<()> {
+    blocking(move || {
+        let state = app.state::<AppState>();
+        let settings = settings.sanitized();
+        settings.save(&state.paths.settings_file()).map_err(err)?;
+        *state.settings.lock().map_err(err)? = settings;
+        apply_autostart(&app);
+        Ok(())
+    })
+    .await
+}
+
+/// Settings as pretty JSON, to copy to another PC.
+#[tauri::command]
+pub fn settings_export(state: State<'_, AppState>) -> CmdResult<String> {
+    serde_json::to_string_pretty(&*state.settings.lock().map_err(err)?).map_err(err)
+}
+
+/// Load settings from JSON pasted by the user (checked before it is used).
+#[tauri::command]
+pub async fn settings_import(app: AppHandle, json: String) -> CmdResult<Settings> {
+    blocking(move || {
+        let parsed: Settings = serde_json::from_str(json.trim()).map_err(|e| format!("Not valid Sweeplark settings: {e}"))?;
+        let parsed = parsed.sanitized();
+        let state = app.state::<AppState>();
+        parsed.save(&state.paths.settings_file()).map_err(err)?;
+        *state.settings.lock().map_err(err)? = parsed.clone();
+        apply_autostart(&app);
+        sweeplark_core::log::info("settings imported");
+        Ok(parsed)
+    })
+    .await
 }
 
 #[derive(Serialize)]
@@ -361,32 +431,45 @@ pub fn ai_install(app: AppHandle, tier: Tier, cancel: bool) -> CmdResult<()> {
                     st.ai.tier = Some(tier);
                     let _ = st.save(&state.paths.settings_file());
                 }
+                crate::settings_changed(&app);
+                sweeplark_core::log::info(&format!("AI model installed: {tier:?}"));
                 emit(InstallProgress { stage: "done".into(), tier: Some(tier), done: 1, total: 1, error: None });
             }
-            Err(e) => emit(InstallProgress { stage: "error".into(), tier: Some(tier), done: 0, total: 0, error: Some(e) }),
+            Err(e) => {
+                sweeplark_core::log::warn(&format!("AI install failed: {e}"));
+                emit(InstallProgress { stage: "error".into(), tier: Some(tier), done: 0, total: 0, error: Some(e) })
+            }
         }
     });
     Ok(())
 }
 
 #[tauri::command]
-pub fn ai_remove(state: State<'_, AppState>, tier: Tier) -> CmdResult<()> {
-    if state.ai.loaded_tier() == Some(tier) {
-        state.ai.unload();
-    }
-    runtime::remove_model(&state.ai.paths, state.catalog.get(tier)).map_err(err)?;
-    let mut s = state.settings.lock().map_err(err)?;
-    if s.ai.tier == Some(tier) {
-        s.ai.enabled = false;
-        s.ai.tier = None;
-        s.save(&state.paths.settings_file()).map_err(err)?;
-    }
-    Ok(())
+pub async fn ai_remove(app: AppHandle, tier: Tier) -> CmdResult<()> {
+    blocking(move || {
+        let state = app.state::<AppState>();
+        if state.ai.loaded_tier() == Some(tier) {
+            state.ai.unload();
+        }
+        runtime::remove_model(&state.ai.paths, state.catalog.get(tier)).map_err(err)?;
+        let mut s = state.settings.lock().map_err(err)?;
+        if s.ai.tier == Some(tier) {
+            s.ai.enabled = false;
+            s.ai.tier = None;
+            s.save(&state.paths.settings_file()).map_err(err)?;
+        }
+        Ok(())
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn ai_unload(state: State<'_, AppState>) {
-    state.ai.unload();
+pub async fn ai_unload(app: AppHandle) -> CmdResult<()> {
+    blocking(move || {
+        app.state::<AppState>().ai.unload();
+        Ok(())
+    })
+    .await
 }
 
 /// Real PC data for the assistant's tools.
@@ -411,6 +494,24 @@ impl PcSource for RealPc {
         let state = self.app.state::<AppState>();
         let l = state.ledger.lock().ok()?;
         Some((l.summary().ok()?, l.list(5).ok()?))
+    }
+    fn tweaks(&self) -> Vec<sweeplark_core::tweaks::TweakState> {
+        let state = self.app.state::<AppState>();
+        let c = crate::pc::ctx(&self.app);
+        let Ok(ledger) = state.ledger.lock() else { return Vec::new() };
+        sweeplark_core::tweaks::states(&state.tweaks, system_registry().as_ref(), &ledger, &c)
+    }
+    fn live(&self) -> Option<sweeplark_core::monitor::LiveStats> {
+        Some(self.app.state::<AppState>().monitor.lock().ok()?.sample())
+    }
+    fn background(&self) -> Option<sweeplark_core::boost::BoostPlan> {
+        let never = crate::pc::never_list(&self.app);
+        let state = self.app.state::<AppState>();
+        let mut m = state.monitor.lock().ok()?;
+        Some(sweeplark_core::boost::plan(&mut m, &never))
+    }
+    fn apps(&self) -> Vec<sweeplark_core::apps::InstalledApp> {
+        sweeplark_core::apps::installed(system_registry().as_ref())
     }
 }
 
@@ -465,11 +566,22 @@ pub async fn efficiency_mode(app: AppHandle, name: String, on: bool) -> CmdResul
         let mut sys = System::new_with_specifics(RefreshKind::nothing()).map_err(err)?;
         sys.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing());
         let want = name.to_lowercase();
+        let own = std::process::id();
         let mut changed = 0;
+        let mut revert = Vec::new();
         for (pid, p) in sys.processes() {
             let pname = p.name().to_string_lossy().to_lowercase();
-            if (pname == want || pname.trim_end_matches(".exe") == want) && system::set_efficiency_mode(pid.as_u32(), on).is_ok() {
-                changed += 1;
+            if pid.as_u32() == own || p.parent().is_some_and(|pp| pp.as_u32() == own) {
+                continue; // never our own window or AI engine
+            }
+            if pname == want || pname.trim_end_matches(".exe") == want {
+                let before = system::priority_class(pid.as_u32());
+                if system::set_efficiency_mode(pid.as_u32(), on).is_ok() {
+                    changed += 1;
+                    if on && let Some(prio) = before.filter(|p| *p != 0x40) {
+                        revert.push(sweeplark_core::revert::RevertStep::ProcessPriority { pid: pid.as_u32(), name: pname.clone(), priority: prio });
+                    }
+                }
             }
         }
         if changed == 0 {
@@ -481,12 +593,12 @@ pub async fn efficiency_mode(app: AppHandle, name: String, on: bool) -> CmdResul
             .record(&NewChange {
                 category: "optimize".into(),
                 title: format!("Efficiency mode {}: {name} ({changed} processes)", if on { "on" } else { "off" }),
-                risk: Risk::Ask,
+                risk: Risk::Safe,
                 status: ChangeStatus::Applied,
                 bytes_freed: 0,
                 items: u64::from(changed),
                 details: serde_json::json!({ "name": name, "on": on, "note": "Lasts until the app closes" }),
-                revert: Vec::new(),
+                revert,
             })
             .map_err(err)?;
         Ok(changed)
@@ -498,31 +610,35 @@ pub async fn efficiency_mode(app: AppHandle, name: String, on: bool) -> CmdResul
 pub fn open_windows_security() -> CmdResult<()> {
     #[cfg(windows)]
     {
-        std::process::Command::new("explorer").arg("windowsdefender:").spawn().map_err(err)?;
+        std::process::Command::new(sweeplark_core::platform::ops::system_exe("explorer.exe")).arg("windowsdefender:").spawn().map_err(err)?;
     }
     Ok(())
 }
 
+/// Start Sweeplark again as administrator (Windows asks with UAC) and open `page` there.
+/// Settings, history and the AI model are shared, so nothing is lost.
 #[tauri::command]
-pub fn relaunch_as_admin(app: AppHandle) -> CmdResult<()> {
+pub fn relaunch_as_admin(app: AppHandle, page: Option<String>) -> CmdResult<()> {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
         let exe = std::env::current_exe().map_err(err)?;
+        let page = page.filter(|p| p.chars().all(|c| c.is_ascii_lowercase())).unwrap_or_default();
+        let args = if page.is_empty() { String::new() } else { format!(" -ArgumentList '--page={page}'") };
         let script = format!(
-            "Start-Sleep -Milliseconds 800; Start-Process -FilePath '{}' -Verb RunAs",
+            "Start-Sleep -Milliseconds 800; Start-Process -FilePath '{}' -Verb RunAs{args}",
             exe.display().to_string().replace('\'', "''")
         );
-        std::process::Command::new("powershell")
+        sweeplark_core::log::info("restarting as administrator");
+        std::process::Command::new(sweeplark_core::platform::ops::system_exe("powershell"))
             .args(["-NoProfile", "-WindowStyle", "Hidden", "-Command", &script])
             .creation_flags(0x0800_0000)
             .spawn()
             .map_err(err)?;
-        app.state::<AppState>().ai.unload();
-        app.exit(0);
+        crate::quit(&app);
     }
     #[cfg(not(windows))]
-    let _ = app;
+    let _ = (app, page);
     Ok(())
 }
 
@@ -537,8 +653,14 @@ pub fn start_update_check(app: AppHandle) {
         std::thread::sleep(std::time::Duration::from_secs(15));
         loop {
             let s = settings_of(&app);
-            if s.check_updates
-                && let Ok(Some(info)) = update::check(env!("CARGO_PKG_VERSION"))
+            // Offline at sign-in is common: try again in 30 minutes instead of 12 hours.
+            let mut wait = std::time::Duration::from_secs(12 * 3600);
+            let result = if s.check_updates { update::check(env!("CARGO_PKG_VERSION")) } else { Ok(None) };
+            if let Err(e) = &result {
+                sweeplark_core::log::info(&format!("update check failed, retry in 30 min: {e}"));
+                wait = std::time::Duration::from_secs(30 * 60);
+            }
+            if let Ok(Some(info)) = result
                 && s.skipped_version.as_deref() != Some(info.version.as_str())
             {
                 let first = app.state::<AppState>().update.lock().map(|g| g.is_none()).unwrap_or(false);
@@ -554,7 +676,7 @@ pub fn start_update_check(app: AppHandle) {
                     let _ = app.emit("update-available", info);
                 }
             }
-            std::thread::sleep(std::time::Duration::from_secs(12 * 3600));
+            std::thread::sleep(wait);
         }
     });
 }
@@ -578,7 +700,11 @@ pub async fn update_check(app: AppHandle, manual: bool) -> CmdResult<Option<Upda
 }
 
 #[tauri::command]
-pub fn update_skip(app: AppHandle, version: String) -> CmdResult<()> {
+pub async fn update_skip(app: AppHandle, version: String) -> CmdResult<()> {
+    blocking(move || update_skip_inner(&app, version)).await
+}
+
+fn update_skip_inner(app: &AppHandle, version: String) -> CmdResult<()> {
     let state = app.state::<AppState>();
     let mut s = state.settings.lock().map_err(err)?;
     s.skipped_version = Some(version);
@@ -593,11 +719,17 @@ pub fn update_skip(app: AppHandle, version: String) -> CmdResult<()> {
 pub async fn update_install(app: AppHandle) -> CmdResult<()> {
     let info = app.state::<AppState>().update.lock().map_err(err)?.clone().ok_or("No update")?;
     if sweeplark_core::paths::AppPaths::is_portable() || info.setup_url.is_none() {
-        #[cfg(windows)]
-        std::process::Command::new("explorer").arg(&info.page_url).spawn().map_err(err)?;
-        return Ok(());
+        return open_url(info.page_url.clone());
     }
     let dir = app.state::<AppState>().paths.data_dir.join("updates");
+    // Old installers from earlier updates are not needed any more.
+    if let Ok(rd) = std::fs::read_dir(&dir) {
+        for e in rd.flatten() {
+            if !e.file_name().to_string_lossy().contains(&info.version) {
+                let _ = std::fs::remove_file(e.path());
+            }
+        }
+    }
     let app2 = app.clone();
     let path = blocking(move || {
         let mut last = 0u64;
@@ -610,11 +742,16 @@ pub async fn update_install(app: AppHandle) -> CmdResult<()> {
         })
         .map_err(err)
     })
-    .await?;
-    std::process::Command::new(path).arg("/P").spawn().map_err(err)?;
-    app.state::<AppState>().ai.unload();
-    app.exit(0);
+    .await;
+    let path = logged("update download", path)?;
+    sweeplark_core::log::info(&format!("installing update {}", info_version(&app)));
+    std::process::Command::new(path).arg("/P").arg("/R").spawn().map_err(err)?;
+    crate::quit(&app);
     Ok(())
+}
+
+fn info_version(app: &AppHandle) -> String {
+    app.state::<AppState>().update.lock().ok().and_then(|g| g.as_ref().map(|i| i.version.clone())).unwrap_or_default()
 }
 
 /// Open an https link in the default browser (About section, release page).
@@ -624,6 +761,44 @@ pub fn open_url(url: String) -> CmdResult<()> {
         return Err("Only https links can be opened".into());
     }
     #[cfg(windows)]
-    std::process::Command::new("explorer").arg(&url).spawn().map_err(err)?;
+    std::process::Command::new(sweeplark_core::platform::ops::system_exe("explorer.exe")).arg(&url).spawn().map_err(err)?;
     Ok(())
+}
+
+/// The page the window should open on (set by the tray before the window existed).
+#[tauri::command]
+pub fn take_pending_page(state: State<'_, AppState>) -> Option<String> {
+    state.pending_page.lock().ok().and_then(|mut g| g.take())
+}
+
+/// Open the folder with Sweeplark's log files.
+#[tauri::command]
+pub fn logs_open() -> CmdResult<()> {
+    let dir = sweeplark_core::log::dir().ok_or("No log folder yet")?;
+    #[cfg(windows)]
+    std::process::Command::new(sweeplark_core::platform::ops::system_exe("explorer.exe")).arg(&dir).spawn().map_err(err)?;
+    let _ = dir;
+    Ok(())
+}
+
+/// Text for a bug report: version, Windows version and the last log lines (no personal data:
+/// user-folder paths are shortened to %USERPROFILE%).
+#[tauri::command]
+pub async fn bug_report() -> CmdResult<String> {
+    blocking(|| {
+        let os = sysinfo::System::long_os_version().unwrap_or_else(|_| std::env::consts::OS.into());
+        let mut log = sweeplark_core::log::tail(40);
+        if let Some(home) = directories::UserDirs::new().map(|u| u.home_dir().display().to_string())
+            && !home.is_empty()
+        {
+            log = log.replace(&home, "%USERPROFILE%");
+        }
+        Ok(format!(
+            "Sweeplark {}{}\nWindows: {os}\nAdmin: {}\n\nWhat happened:\n\n\nLast log lines:\n```\n{log}\n```",
+            env!("CARGO_PKG_VERSION"),
+            if sweeplark_core::paths::AppPaths::is_portable() { " (portable)" } else { "" },
+            system::is_admin()
+        ))
+    })
+    .await
 }

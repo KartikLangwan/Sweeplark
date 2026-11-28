@@ -18,6 +18,9 @@
   import Storage from "./pages/Storage.svelte";
   import Tools from "./pages/Tools.svelte";
   import UpdateModal from "./components/UpdateModal.svelte";
+  import JobDock from "./components/JobDock.svelte";
+  import Apps from "./pages/Apps.svelte";
+  import { listenJobs } from "./lib/jobs.svelte";
 
   const nav = $derived<{ id: Page; label: string; icon: string }[]>([
     { id: "home", label: t("Home", "Home"), icon: "home" },
@@ -26,6 +29,7 @@
     { id: "clean", label: t("Clean", "Safai"), icon: "broom" },
     { id: "monitor", label: t("Monitor", "Monitor"), icon: "pulse" },
     { id: "storage", label: t("Storage", "Storage"), icon: "disk" },
+    { id: "apps", label: t("Apps", "Apps"), icon: "apps" },
     { id: "startup", label: t("Startup", "Startup"), icon: "leaf" },
     { id: "health", label: t("Health", "Sehat"), icon: "shield" },
     { id: "tools", label: t("Tools", "Tools"), icon: "settings" },
@@ -36,23 +40,22 @@
   ]);
 
   onMount(() => {
-    try {
-      const t = localStorage.getItem("theme");
-      if (t === "light" || t === "dark") ui.theme = t;
-    } catch { /* ignore */ }
     api.appInfo().then((i) => (ui.info = i));
     api.settings().then((s) => (ui.settings = s));
+    api.pendingPage().then((p) => { if (p) go(p as Page); }).catch(() => {});
     refreshInbox();
+    listenJobs();
     const unsubs: Promise<() => void>[] = [
       on<string>("navigate", (p) => go(p as Page)),
       on("inbox-changed", () => refreshInbox()),
+      on("settings-changed", () => api.settings().then((s) => (ui.settings = s))),
     ];
     const timer = setInterval(refreshInbox, 60000);
     return () => { clearInterval(timer); unsubs.forEach((u) => u.then((f) => f())); };
   });
 
   function cycleTheme() {
-    applyTheme(ui.theme === "system" ? "dark" : ui.theme === "dark" ? "light" : "system");
+    applyTheme(ui.theme === "dark" ? "light" : "dark");
   }
 </script>
 
@@ -74,12 +77,13 @@
       {/each}
     </nav>
     <div class="foot">
+      <JobDock />
       <div class="local"><Icon name="lock" size={14} /><span>{t("Offline · no tracking", "Offline · koi tracking nahi")}</span></div>
       <div class="row">
-        <span class="muted small">v{ui.info?.version ?? "1.4.0"}</span>
+        <span class="muted small">v{ui.info?.version ?? "1.4.1"}</span>
         <span class="spacer"></span>
-        <button class="btn ghost small" onclick={cycleTheme} title="Theme: {ui.theme}" aria-label={t("Change theme", "Theme badlein")}>
-          <Icon name={ui.theme === "dark" ? "moon" : ui.theme === "light" ? "sun" : "sparkle"} size={16} />
+        <button class="btn ghost small" onclick={cycleTheme} title={ui.theme === "dark" ? t("Switch to light", "Light theme") : t("Switch to dark", "Dark theme")} aria-label={ui.theme === "dark" ? t("Switch to light theme", "Light theme lagayein") : t("Switch to dark theme", "Dark theme lagayein")}>
+          <Icon name={ui.theme === "dark" ? "sun" : "moon"} size={16} />
         </button>
       </div>
     </div>
@@ -93,6 +97,7 @@
         {:else if ui.page === "optimizer"}<Optimizer />
         {:else if ui.page === "monitor"}<Monitor />
         {:else if ui.page === "storage"}<Storage />
+        {:else if ui.page === "apps"}<Apps />
         {:else if ui.page === "tools"}<Tools />
         {:else if ui.page === "clean"}<Clean />
         {:else if ui.page === "startup"}<Startup />

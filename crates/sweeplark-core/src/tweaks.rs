@@ -88,6 +88,8 @@ pub struct TweakDef {
     #[serde(default)]
     pub note: Option<String>,
     #[serde(default)]
+    pub note_hi: Option<String>,
+    #[serde(default)]
     pub source: Option<String>,
     /// A two-way setting (on/off) rather than an optimization.
     #[serde(default)]
@@ -208,12 +210,21 @@ pub struct TweakContext {
 }
 
 impl TweakContext {
+    /// Read once and keep: Windows build, laptop or not and graphics cards do not change while
+    /// the app runs. Callers refresh `is_admin` and `lang` per call (both are cheap).
     pub fn system(lang: Lang) -> Self {
-        let h = crate::health::snapshot(false);
+        let gpu_names = sysinfo::Gpus::new_with_refreshed_list()
+            .map(|list| {
+                list.iter()
+                    .map(|g| [g.vendor(), g.model()].into_iter().flatten().collect::<Vec<_>>().join(" ").to_lowercase())
+                    .filter(|n| !n.trim().is_empty())
+                    .collect()
+            })
+            .unwrap_or_default();
         Self {
             windows_build: sysinfo::System::kernel_version().ok().and_then(|v| v.split('.').next_back()?.parse().ok()).unwrap_or(0),
             laptop: crate::platform::system::battery().is_some(),
-            gpu_names: h.gpus.iter().map(|g| g.name.to_lowercase()).collect(),
+            gpu_names,
             is_admin: crate::platform::system::is_admin(),
             lang,
         }
@@ -355,7 +366,7 @@ pub fn states(set: &TweakSet, reg: &dyn RegistryBackend, ledger: &Ledger, ctx: &
             recommended: t.recommended,
             setting: t.setting,
             restart: t.restart.clone(),
-            note: t.note.clone(),
+            note: t.note.as_deref().map(|n| ctx.lang.pick_opt(n, t.note_hi.as_deref()).to_string()),
             source: t.source.clone(),
             needs_admin: t.needs_admin(),
             available: ctx.allows(t),

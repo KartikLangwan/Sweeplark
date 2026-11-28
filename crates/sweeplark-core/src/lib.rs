@@ -8,6 +8,7 @@
 
 pub mod advisor;
 pub mod agent;
+pub mod apps;
 pub mod ai;
 pub mod branding;
 pub mod boost;
@@ -15,6 +16,7 @@ pub mod cleaner;
 pub mod error;
 pub mod health;
 pub mod lang;
+pub mod log;
 pub mod monitor;
 pub mod ledger;
 pub mod optimize;

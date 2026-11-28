@@ -2,6 +2,10 @@
   // Small line-icon set (24px grid, 1.8 stroke), drawn for Sweeplark.
   let { name, size = 20 }: { name: string; size?: number } = $props();
   const paths: Record<string, string> = {
+    apps: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z",
+    copy: "M8 8h11v12H8zM5 16V4h11",
+    game: "M7 8h10a4 4 0 0 1 4 4v3a3 3 0 0 1-5.4 1.8L14 15h-4l-1.6 1.8A3 3 0 0 1 3 15v-3a4 4 0 0 1 4-4zM8 10.5v3M6.5 12h3M15.5 11.5h.01M17.5 13.5h.01",
+    bug: "M8 9h8v6a4 4 0 0 1-8 0zM9 6.5 10.5 9M15 6.5 13.5 9M4 13h4M16 13h4M5 18l3-2M19 18l-3-2M5 8l3 2M19 8l-3 2",
     home: "M3 11.5 12 4l9 7.5M5.5 9.5V20h13V9.5M10 20v-5.5h4V20",
     sparkle: "M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18",
     broom: "M14 4l6 6M12.5 5.5l6 6-4 4-6-6zM8.5 9.5 3 15c-.8.8 1.5 4.8 2.5 5 1-.2 3-1 4.5-2.5l2-2",

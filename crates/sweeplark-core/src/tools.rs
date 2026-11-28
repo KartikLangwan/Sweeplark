@@ -2,17 +2,56 @@
 
 use serde::Serialize;
 
-use crate::platform::ops::run;
+use crate::platform::ops::{self, run};
 use crate::{Error, Result};
 
 /// Run a command in a visible, elevated console (the user sees progress and the UAC prompt).
 fn elevated_console(script: &str) -> Result<()> {
     let ps = format!(
-        "Start-Process -FilePath cmd.exe -Verb RunAs -ArgumentList '/k {}'",
+        "Start-Process -FilePath $env:ComSpec -Verb RunAs -ArgumentList '/k {}'",
         script.replace('\'', "''")
     );
     let out = run("powershell", &["-NoProfile", "-WindowStyle", "Hidden", "-Command", &ps])?;
     if out.status.success() { Ok(()) } else { Err(Error::Other("cancelled".into())) }
+}
+
+fn system_drive() -> String {
+    std::env::var("SystemDrive").ok().filter(|d| d.len() == 2 && d.ends_with(':')).unwrap_or_else(|| "C:".into())
+}
+
+fn restart_explorer() -> Result<()> {
+    let _ = run("taskkill", &["/F", "/IM", "explorer.exe"]);
+    std::thread::sleep(std::time::Duration::from_millis(800));
+    std::process::Command::new(ops::system_exe("explorer.exe")).spawn().map_err(|e| Error::Other(e.to_string()))?;
+    Ok(())
+}
+
+/// Create a Windows restore point (needs administrator). Windows normally allows one per
+/// 24 hours; the limit is lifted for this one call and put back right after.
+pub fn create_restore_point(description: &str) -> Result<()> {
+    if !crate::platform::system::is_admin() {
+        return Err(Error::NeedsAdmin("restore point".into()));
+    }
+    let desc: String = description.chars().filter(|c| c.is_alphanumeric() || " .:-_()".contains(*c)).take(60).collect();
+    let script = format!(
+        "$ErrorActionPreference='Stop'; $k='HKLM:\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\SystemRestore'; \
+         $old=(Get-ItemProperty $k -Name SystemRestorePointCreationFrequency -ErrorAction SilentlyContinue).SystemRestorePointCreationFrequency; \
+         Set-ItemProperty $k -Name SystemRestorePointCreationFrequency -Value 0 -Type DWord; \
+         try {{ Checkpoint-Computer -Description 'Sweeplark: {desc}' -RestorePointType MODIFY_SETTINGS }} \
+         finally {{ if ($null -eq $old) {{ Remove-ItemProperty $k -Name SystemRestorePointCreationFrequency -ErrorAction SilentlyContinue }} \
+         else {{ Set-ItemProperty $k -Name SystemRestorePointCreationFrequency -Value $old -Type DWord }} }}"
+    );
+    let out = run("powershell", &["-NoProfile", "-NonInteractive", "-Command", &script])?;
+    if out.status.success() {
+        crate::log::info(&format!("restore point created: {desc}"));
+        Ok(())
+    } else {
+        let msg = ops::decode_output(&out.stderr);
+        crate::log::warn(&format!("restore point failed: {}", msg.trim()));
+        Err(Error::Other(
+            "Could not create a restore point. System Protection may be off for the system drive (Control Panel > System > System Protection).".into(),
+        ))
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, serde::Deserialize, PartialEq, Eq)]
@@ -27,6 +66,8 @@ pub enum Tool {
     ResetWindowsUpdate,
     DiskCheck,
     CancelShutdown,
+    ComponentCleanup,
+    RestorePoint,
 }
 
 pub fn run_tool(tool: Tool) -> Result<String> {
@@ -35,12 +76,7 @@ pub fn run_tool(tool: Tool) -> Result<String> {
             let out = run("ipconfig", &["/flushdns"])?;
             if out.status.success() { Ok("DNS cache cleared".into()) } else { Err(Error::Other("ipconfig failed".into())) }
         }
-        Tool::RestartExplorer => {
-            let _ = run("taskkill", &["/F", "/IM", "explorer.exe"]);
-            std::thread::sleep(std::time::Duration::from_millis(800));
-            std::process::Command::new("explorer.exe").spawn().map_err(|e| Error::Other(e.to_string()))?;
-            Ok("Explorer restarted".into())
-        }
+        Tool::RestartExplorer => restart_explorer().map(|_| "Explorer restarted".into()),
         Tool::RebuildIconCache => {
             let _ = run("ie4uinit.exe", &["-show"]);
             if let Ok(local) = std::env::var("LOCALAPPDATA") {
@@ -55,20 +91,37 @@ pub fn run_tool(tool: Tool) -> Result<String> {
                     }
                 }
                 let _ = std::fs::remove_file(std::path::Path::new(&local).join("IconCache.db"));
-                std::process::Command::new("explorer.exe").spawn().map_err(|e| Error::Other(e.to_string()))?;
+                std::thread::sleep(std::time::Duration::from_millis(500));
+                std::process::Command::new(ops::system_exe("explorer.exe")).spawn().map_err(|e| Error::Other(e.to_string()))?;
             }
             Ok("Icon cache rebuilt".into())
         }
         Tool::Sfc => elevated_console("sfc /scannow").map(|_| "System file check started".into()),
         Tool::Dism => elevated_console("DISM /Online /Cleanup-Image /RestoreHealth").map(|_| "Windows image repair started".into()),
-        Tool::DiskCheck => elevated_console("chkdsk C: /scan").map(|_| "Disk check started".into()),
+        Tool::DiskCheck => elevated_console(&format!("chkdsk {} /scan", system_drive())).map(|_| "Disk check started".into()),
+        Tool::ComponentCleanup => elevated_console("DISM /Online /Cleanup-Image /StartComponentCleanup && echo. && echo Done. Old Windows update files were removed.")
+            .map(|_| "Windows update cleanup started".into()),
+        // Not admin: ask Windows (UAC) and show it in its own window, like the other repairs.
+        Tool::RestorePoint if !crate::platform::system::is_admin() => elevated_console(
+            "powershell -NoProfile -Command \"Checkpoint-Computer -Description 'Sweeplark manual' -RestorePointType MODIFY_SETTINGS\" && echo. && echo Restore point created.",
+        )
+        .map(|_| "Restore point started".into()),
+        Tool::RestorePoint => create_restore_point("manual").map(|_| "Restore point created".into()),
         Tool::ResetNetwork => elevated_console(
             "netsh winsock reset && netsh int ip reset && ipconfig /release && ipconfig /renew && ipconfig /flushdns && echo. && echo Restart the PC to finish.",
         )
         .map(|_| "Network reset started".into()),
-        Tool::ResetWindowsUpdate => elevated_console(
-            "net stop wuauserv && net stop bits && net stop cryptsvc && ren %SystemRoot%\\SoftwareDistribution SoftwareDistribution.old && ren %SystemRoot%\\System32\\catroot2 catroot2.old && net start cryptsvc && net start bits && net start wuauserv && echo. && echo Windows Update components reset.",
-        )
+        // Every step runs even if one fails ("&"), so the services are always started again,
+        // and an old backup from an earlier run is removed first so "ren" cannot fail.
+        Tool::ResetWindowsUpdate => elevated_console(concat!(
+            "net stop wuauserv /y & net stop bits /y & net stop cryptsvc /y",
+            " & (if exist \"%SystemRoot%\\SoftwareDistribution.old\" rd /s /q \"%SystemRoot%\\SoftwareDistribution.old\")",
+            " & ren \"%SystemRoot%\\SoftwareDistribution\" SoftwareDistribution.old",
+            " & (if exist \"%SystemRoot%\\System32\\catroot2.old\" rd /s /q \"%SystemRoot%\\System32\\catroot2.old\")",
+            " & ren \"%SystemRoot%\\System32\\catroot2\" catroot2.old",
+            " & net start cryptsvc & net start bits & net start wuauserv",
+            " & echo. & echo Windows Update components reset. Restart the PC if updates still fail."
+        ))
         .map(|_| "Windows Update reset started".into()),
         Tool::CancelShutdown => {
             let _ = run("shutdown", &["/a"]);
@@ -102,7 +155,7 @@ pub fn open_windows_tool(name: &str) -> Result<()> {
         "environment" => ("rundll32", &["sysdm.cpl,EditEnvironmentVariables"]),
         _ => return Err(Error::NotFound(name.into())),
     };
-    std::process::Command::new(prog).args(args).spawn().map(|_| ()).map_err(|e| Error::Other(e.to_string()))
+    std::process::Command::new(ops::system_exe(prog)).args(args).spawn().map(|_| ()).map_err(|e| Error::Other(e.to_string()))
 }
 
 #[derive(Debug, Clone, Default, Serialize)]

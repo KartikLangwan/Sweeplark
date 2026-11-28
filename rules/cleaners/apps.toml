@@ -54,3 +54,74 @@ category = "apps"
 risk = "safe"
 [[cleaner.target]]
 path = "%USERPROFILE%/AppData/LocalLow/Sun/Java/Deployment/cache"
+
+[[cleaner]]
+id = "teams.new.cache"
+name = "Microsoft Teams (new) cache"
+name_hi = "Microsoft Teams (naya) cache"
+description = "Cached files of the new Teams app. Chats and login stay safe."
+description_hi = "Naye Teams app ki cached files. Chats aur login safe rahenge."
+category = "apps"
+risk = "safe"
+running = ["ms-teams.exe", "msteams.exe"]
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Packages/MSTeams_8wekyb3d8bbwe/LocalCache/Microsoft/MSTeams/EBWebView/*/Cache"
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Packages/MSTeams_8wekyb3d8bbwe/LocalCache/Microsoft/MSTeams/EBWebView/*/Code Cache"
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Packages/MSTeams_8wekyb3d8bbwe/LocalCache/Microsoft/MSTeams/EBWebView/*/GPUCache"
+
+[[cleaner]]
+id = "spotify.cache"
+name = "Spotify cache"
+description = "Streamed songs Spotify keeps on disk. Downloaded (offline) songs stay safe."
+description_hi = "Spotify ke stream kiye gaane ki cache. Download kiye (offline) gaane safe rahenge."
+category = "apps"
+risk = "safe"
+running = ["spotify.exe"]
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Spotify/Data"
+remove_empty_dirs = true
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Spotify/Browser/Cache"
+
+[[cleaner]]
+id = "zoom.logs"
+name = "Zoom logs"
+description = "Old Zoom log files."
+description_hi = "Zoom ki purani log files."
+category = "apps"
+risk = "safe"
+running = ["zoom.exe"]
+[[cleaner.target]]
+path = "%APPDATA%/Zoom/logs"
+min_age_hours = 24
+
+[[cleaner]]
+id = "onedrive.logs"
+name = "OneDrive logs"
+description = "Old OneDrive log files. Your synced files are not touched."
+description_hi = "OneDrive ki purani log files. Sync hui files ko haath nahi lagega."
+category = "apps"
+risk = "safe"
+[[cleaner.target]]
+path = "%LOCALAPPDATA%/Microsoft/OneDrive/logs"
+include = ["**/*.odl*", "**/*.aodl", "**/*.otc", "**/*.log", "**/*.etl"]
+min_age_hours = 72
+
+[[cleaner]]
+id = "adobe.media_cache"
+name = "Adobe media cache"
+description = "Preview files Premiere Pro and After Effects rebuild when needed."
+description_hi = "Premiere Pro aur After Effects ki preview files; zarurat par dobara ban jaati hain."
+category = "apps"
+risk = "ask"
+note = "Open projects build their previews again the next time, which takes a while."
+note_hi = "Projects agli baar previews dobara banayenge, thoda time lagega."
+running = ["adobe premiere pro.exe", "afterfx.exe", "adobe media encoder.exe"]
+[[cleaner.target]]
+path = "%APPDATA%/Adobe/Common/Media Cache Files"
+[[cleaner.target]]
+path = "%APPDATA%/Adobe/Common/Media Cache"
+[[cleaner.target]]
+path = "%APPDATA%/Adobe/Common/Peak Files"

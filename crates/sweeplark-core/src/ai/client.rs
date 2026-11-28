@@ -42,10 +42,16 @@ impl Default for Sampling {
 pub struct LlamaClient {
     base: String,
     agent: ureq::Agent,
+    /// Random key the engine was started with, so other programs on the PC can't use it.
+    key: Option<String>,
 }
 
 impl LlamaClient {
     pub fn new(port: u16) -> Self {
+        Self::with_key(port, None)
+    }
+
+    pub fn with_key(port: u16, key: Option<String>) -> Self {
         let agent = ureq::Agent::config_builder()
             .proxy(None) // local only: never send prompts through a proxy
             .timeout_connect(Some(Duration::from_secs(2)))
@@ -53,7 +59,7 @@ impl LlamaClient {
             .http_status_as_error(false)
             .build()
             .into();
-        Self { base: format!("http://127.0.0.1:{port}"), agent }
+        Self { base: format!("http://127.0.0.1:{port}"), agent, key }
     }
 
     pub fn is_ready(&self) -> bool {
@@ -82,9 +88,11 @@ impl LlamaClient {
     }
 
     fn post(&self, body: &Value) -> Result<ureq::http::Response<ureq::Body>> {
-        let resp = self
-            .agent
-            .post(format!("{}/v1/chat/completions", self.base))
+        let mut req = self.agent.post(format!("{}/v1/chat/completions", self.base));
+        if let Some(k) = &self.key {
+            req = req.header("Authorization", &format!("Bearer {k}"));
+        }
+        let resp = req
             .send_json(body)
             .map_err(|e| Error::Other(format!("AI engine did not answer: {e}")))?;
         if resp.status().as_u16() != 200 {

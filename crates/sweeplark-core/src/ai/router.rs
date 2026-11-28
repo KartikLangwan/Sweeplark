@@ -41,6 +41,25 @@ const RULES: &[(Tool, &[&str])] = &[
             "रिपोर्ट", "आज", "हफ्ते",
         ],
     ),
+    (
+        Tool::Optimizer,
+        &[
+            "optimi", "tweak", "setting", "fast kar", "tez kar", "speed up", "boost", "telemetry", "privacy", "game mode",
+            "fps", "gaming", "ऑप्टिम", "तेज कर",
+        ],
+    ),
+    (Tool::Graphics, &["gpu", "graphics", "vram", "video memory", "nvidia", "radeon", "game", "fps", "ग्राफिक"]),
+    (
+        Tool::Background,
+        &[
+            "ram", "memory", "background", "boost", "khaali", "free ram", "hang", "lag", "slow", "dheem", "game", "fps",
+            "बैकग्राउंड", "रैम",
+        ],
+    ),
+    (
+        Tool::Apps,
+        &["uninstall", "install", "program", "software", "app hata", "apps", "update", "अनइंस्टॉल", "ऐप"],
+    ),
 ];
 
 /// Tools to run for this question. Specs and Problems are always included: they are short
